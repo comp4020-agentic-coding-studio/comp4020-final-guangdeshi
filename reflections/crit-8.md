@@ -1,25 +1,21 @@
-# Crit 8 — It's alive!
+# Crit 8 Reflection
 
-**What was the breakthrough that moved the work forward?**
+## What was the breakthrough that moved the work forward?
 
-Realising that "smallest possible schema" and "no separate database server"
-weren't competing constraints but the same constraint pointing at the same
-answer: a single SQLite file on the one volume Fly already gives this app,
-opened with Node's own built-in `node:sqlite` rather than reaching for a
-package. Once that was settled, almost everything else simplified with it —
-no ORM to configure, no second process to deploy, no dependency install step
-in the Docker image at all. The whole app ended up with zero runtime npm
-dependencies, which wasn't a goal going in, just what fell out of taking
-"smallest possible" literally instead of as a figure of speech.
+The breakthrough was realizing that "multi-user" did not need to begin with
+realtime synchronization.
 
-**What did this work change about who I want to be as a software developer?**
+If one visitor removes a stick and that change remains in the database, the
+next visitor already experiences a world changed by someone before them.
 
-It's a small counterweight to a habit of reaching for a framework before
-checking whether the problem needs one. A pile of sticks and a table that
-records which ids are gone didn't need routing middleware, an ORM, or a
-bundler — `node:http` and three SQL statements were enough, and having
-nothing between the request and the response made every part of the
-persistence story easy to state and easy to check by hand. I want to keep
-asking "what's the smallest thing that's still honest about what it does"
-before reaching for the bigger, more familiar tool, especially this early in
-a project where the first choice is the one everything else gets built on.
+This allowed me to reduce the project to one small but complete interaction:
+remove one valid stick and leave that change behind.
+
+## What did this work change about who I want to be as a software developer?
+
+This work changed how I think about completeness.
+
+More features do not automatically make a better product. I want to become
+a developer who identifies the smallest interaction that proves the
+important idea, makes it reliable, tests it, and only then adds more
+complexity.
