@@ -1,18 +1,18 @@
 # syntax = docker/dockerfile:1
 
-# A placeholder, and yours to replace: it serves one page, plus README.md
-# verbatim at /readme/, which is enough to prove the deploy path end to end.
-# Whatever your app is built with, the image that replaces this one must serve
-# HTTP on 0.0.0.0:$PORT (fly.toml sets PORT) and publish README.md at /readme/
-# (spec/README.md says what's checked).
+# Plain Node.js: the app has no runtime npm dependencies (only node:http,
+# node:sqlite and node:fs, all built in), and Node 24 runs TypeScript directly
+# via type-stripping, so there's no build step and nothing to bundle. The app
+# must serve HTTP on 0.0.0.0:$PORT (fly.toml sets PORT) and publish
+# README.md at /readme/ (spec/README.md says what's checked) — both are the
+# job of src/server.ts.
+FROM docker.io/library/node:24-alpine
 
-FROM docker.io/library/busybox:1.38.0
-COPY placeholder/ /src/
-COPY README.md /src/
-# README.md goes into the page as-is, HTML-escaped, in place of @README@;
-# rendering it properly is your app's job
-RUN mkdir -p /site/readme \
-    && cp /src/index.html /site/ \
-    && sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' /src/README.md > /src/body \
-    && sed -e '/@README@/{r /src/body' -e 'd}' /src/readme.html > /site/readme/index.html
-CMD ["sh", "-c", "exec httpd -f -p 0.0.0.0:${PORT:-8080} -h /site"]
+WORKDIR /app
+COPY src/ ./src/
+COPY README.md ./README.md
+
+ENV NODE_ENV=production
+EXPOSE 8080
+
+CMD ["node", "src/server.ts"]
