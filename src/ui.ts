@@ -118,7 +118,13 @@ textarea {
 }
 .result-readout { margin-top: 14px; padding: 12px 14px; border-radius: 8px; border: 1px dashed var(--ink-line); font-family: var(--mono); font-size: 0.9rem; }
 
-table.evidence { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+/* Evidence rows carry a timestamp, a name, every variable, a result, and a
+   note — more than fits a 390px viewport at a readable font size. Rather
+   than truncate or stack that (which loses the at-a-glance row shape), the
+   table scrolls horizontally within its own card; the rest of the page
+   never does. */
+.evidence-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.evidence { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 0.88rem; }
 table.evidence th { text-align: left; color: var(--text-dim); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 1px solid var(--ink-line); }
 table.evidence td { padding: 8px; border-bottom: 1px solid var(--ink-line); vertical-align: top; }
 table.evidence tr:last-child td { border-bottom: none; }

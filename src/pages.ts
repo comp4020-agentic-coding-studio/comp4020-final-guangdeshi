@@ -329,8 +329,8 @@ const ROOM_CLIENT_SCRIPT = `
         '</tr>';
     }).join('');
     container.innerHTML =
-      '<table class="evidence"><thead><tr><th>Time</th><th>Participant</th><th>Conditions</th><th>Result</th><th>Note</th></tr></thead><tbody>' +
-      rows + '</tbody></table>' +
+      '<div class="evidence-scroll"><table class="evidence"><thead><tr><th>Time</th><th>Participant</th><th>Conditions</th><th>Result</th><th>Note</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>' +
       '<p style="color:var(--text-dim); font-size:0.82rem; margin-top:10px;">' + state.recommendation.testedCount + ' of ' + state.recommendation.totalCombos + ' combinations tested at least once.</p>';
   }
 
