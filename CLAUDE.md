@@ -1,7 +1,7 @@
 # Your harness
 
 This is the project harness for the **COMP4020/COMP8020 Final Project**
-("Pick-Up Sticks"): one repository, built across crits 8, 9, 10 and the final
+("Bug Relay"): one repository, built across crits 8, 9, 10 and the final
 submission. What the product is and what "good" means for it belongs in
 `README.md`; this file holds the process rules the agent is held to while
 building it.
@@ -14,6 +14,12 @@ room-booking redesign, a fictional course). Anything that was really
 Crit-7-specific — grounding claims in real ANU sources, preserving an existing
 system's interaction model — was dropped, since this project starts from
 nothing rather than extending something real.
+
+**Crit 8 → 9 pivot:** this repo's Crit 8 submission was a different product,
+"Pick-Up Sticks." For Crit 9 the product changed to Bug Relay — a deliberate,
+explicitly-confirmed decision, not a silent one; see `PROCESS.md` for the
+full reasoning. The process rules below (sections 1–12) are unaffected by the
+pivot, since none of them depended on Pick-Up Sticks' specific product.
 
 ## 1. Audit before acting
 
@@ -130,12 +136,20 @@ regardless of that preference.
 ## Current project state
 
 ```
-PRODUCT:   Pick-Up Sticks — a small, persistent, single-player (for now)
-           browser toy: a deterministic pile of ~24 sticks, remove the
-           topmost one, the removal survives a reload/restart/redeploy.
+PRODUCT:   Bug Relay — real-time collaborative bug investigation. One live
+           case (Checkout Failure): participants run experiments against a
+           small deterministic fixture, results are persisted and broadcast
+           live, and a next-test algorithm recommends the most useful
+           untested condition. Two more built-in cases (Responsive Layout
+           Bug, Async State Bug) are named on the landing page but not yet
+           implemented — Crit 9 P1, deferred.
 STACK:     Plain Node.js (node:http, zero runtime npm dependencies) +
-           node:sqlite for persistence, TypeScript run directly (Node 24
-           type-stripping, no build step). Rationale in PROCESS.md.
-STAGE:     Crit 8 — proof of life only. No real-time, no multiplayer, no
-           accounts: those are explicitly Crit 9+ territory per the brief.
+           node:sqlite for persistence, Server-Sent Events for real-time
+           sync, TypeScript run directly (Node 24 type-stripping, no build
+           step). Rationale in PROCESS.md.
+STAGE:     Crit 9 — "All at once." Real-time sync (~1s, no reload),
+           persistent shared evidence, a documented concurrency ADR
+           (docs/adr/0001-concurrent-investigation-evidence.md), and a
+           unit-tested next-test algorithm are in place for the one live
+           case.
 ```
