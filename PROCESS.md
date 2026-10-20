@@ -61,7 +61,8 @@ removed from the working tree — fully recoverable from git history, the
 pushed to origin before migration began.
 `docs/adr/0001-concurrent-investigation-evidence.md` was kept untouched
 alongside the new `0002`, since it documents a real decision this
-repository's history actually made.
+repository's history actually made. The migration itself is commit
+[`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed).
 
 ## Protecting prior history before migrating
 
