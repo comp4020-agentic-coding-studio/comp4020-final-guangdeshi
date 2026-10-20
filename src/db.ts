@@ -83,6 +83,15 @@ export function getUserByHandle(handle: string): User | undefined {
   return row ? rowToUser(row) : undefined;
 }
 
+export function anyAdminExists(): boolean {
+  const row = db.prepare(`SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1`).get();
+  return !!row;
+}
+
+export function promoteToAdmin(userId: string): void {
+  db.prepare(`UPDATE users SET is_admin = 1, updated_at = ? WHERE id = ?`).run(now(), userId);
+}
+
 export interface ProfileUpdate {
   displayName?: string;
   bio?: string;

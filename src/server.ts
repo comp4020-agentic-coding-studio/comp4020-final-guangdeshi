@@ -9,7 +9,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import { URL } from "node:url";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import {
   checkRateLimit,
   createSession,
@@ -28,6 +28,7 @@ import {
   type AuthContext,
 } from "./auth.ts";
 import {
+  anyAdminExists,
   createPost,
   createReport,
   createUser,
@@ -54,6 +55,7 @@ import {
   listRecentActivity,
   activityStats,
   listReports,
+  promoteToAdmin,
   resolveReport,
   setUserInterests,
   softDeletePost,
@@ -344,6 +346,7 @@ async function handle(ctx: RequestContext): Promise<void> {
   if (method === "GET" && path === "/admin/api/reports") return handleAdminReports(ctx);
   const reportResolveMatch = path.match(/^\/admin\/api\/reports\/([a-f0-9-]{36})\/resolve$/);
   if (method === "POST" && reportResolveMatch) return handleAdminResolveReport(ctx, reportResolveMatch[1]);
+  if (method === "POST" && path === "/admin/bootstrap") return handleAdminBootstrap(ctx);
 
   throw new HttpError(404, "not found");
 }
@@ -951,6 +954,41 @@ function handleMyActivity(ctx: RequestContext): void {
 }
 
 // ----------------------------------------------------------------- admin --
+
+/**
+ * One-time, secret-gated promotion of the calling (already-registered,
+ * already-logged-in) account to admin. No credential is baked into the app
+ * or committed anywhere: ADMIN_BOOTSTRAP_SECRET is set via
+ * `flyctl secrets set` (or left unset entirely, which disables this route
+ * outright). It self-disables once any admin exists, so it cannot be used
+ * to mint a second admin account or re-run after the first one — the
+ * intended flow is: register a normal account through the public form,
+ * then call this once with the secret to become that first admin. See
+ * docs/architecture/AUTH_AND_PERMISSIONS.md for the full rationale.
+ */
+async function handleAdminBootstrap(ctx: RequestContext): Promise<void> {
+  const auth = requireAuth(ctx);
+  const configuredSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!configuredSecret) {
+    throw new HttpError(404, "not found");
+  }
+  const body = await parseBody(ctx.req);
+  const providedSecret = typeof body.fields.secret === "string" ? body.fields.secret : "";
+  const expected = Buffer.from(configuredSecret);
+  const actual = Buffer.from(providedSecret);
+  const matches = expected.length === actual.length && timingSafeEqual(expected, actual);
+  if (!matches) {
+    log(ctx, "authorization.denied", "failure", { meta: { attempted: "admin_bootstrap" } });
+    throw new HttpError(403, "invalid bootstrap secret");
+  }
+  if (anyAdminExists()) {
+    throw new HttpError(409, "an admin already exists; bootstrap is one-time only");
+  }
+  promoteToAdmin(auth.user.id);
+  log(ctx, "auth.logged_in", "success", { targetType: "user", targetId: auth.user.id, meta: { reason: "admin_bootstrap" } });
+  if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { ok: true });
+  redirect(ctx.res, "/admin");
+}
 
 function requireAdmin(ctx: RequestContext): AuthContext {
   const auth = requireAuth(ctx);

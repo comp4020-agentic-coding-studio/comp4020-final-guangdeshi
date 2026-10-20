@@ -73,6 +73,34 @@ never from a client-supplied user ID in the request body — so even a
 hand-crafted API request that claims to be acting "as" another user cannot
 bypass the check; the session cookie is the only source of identity.
 
+### Provisioning the first admin safely
+
+No admin credential is baked into the app, committed to the repo, or
+hardcoded anywhere — `is_admin` defaults to `0` for every new registration,
+including whatever accounts are created through the ordinary public
+`/register` form for a demo. The first admin is created through
+`POST /admin/bootstrap` (`handleAdminBootstrap` in `src/server.ts`), gated
+by an `ADMIN_BOOTSTRAP_SECRET` environment variable:
+
+1. Set the secret on the live app once, out-of-band, via
+   `flyctl secrets set ADMIN_BOOTSTRAP_SECRET=<a long random value> -a comp4020-final-guangdeshi`
+   (never committed; `flyctl secrets` stores it encrypted and it is never
+   logged or returned by any route).
+2. Register a normal account through the public `/register` form.
+3. While logged in as that account, `POST /admin/bootstrap` with
+   `secret=<the same value>` (e.g. `curl -b cookies.txt -d
+   "secret=..." https://comp4020-final-guangdeshi.fly.dev/admin/bootstrap`).
+4. That account is now the admin; `/admin/bootstrap` immediately starts
+   rejecting every further call with 409, since `anyAdminExists()` is now
+   true — there is no path to create a second admin this way, intentionally.
+
+If `ADMIN_BOOTSTRAP_SECRET` is never set (e.g. a fresh deploy before anyone
+has configured it), the route returns a plain 404 — indistinguishable from a
+route that doesn't exist — rather than, say, accepting any secret or
+exposing that the route exists at all. The comparison uses
+`timingSafeEqual` against the configured secret so response timing doesn't
+leak how many characters of a guess were correct.
+
 ### Why post authors can't vote on their own posts
 
 This is a deliberate product rule (see `README.md` "Buyer agency"), not an
