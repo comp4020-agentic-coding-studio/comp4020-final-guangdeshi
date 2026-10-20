@@ -10,14 +10,28 @@ requests.
 
 - **Password storage**: `node:crypto`'s `scrypt`, not a hand-rolled scheme
   and not a fast general-purpose hash (never MD5/SHA-256 alone). Parameters:
-  `N=131072 (2^17), r=8, p=1`, OWASP's current baseline recommendation for a
-  dedicated auth server, benchmarked on this machine at ~150-200ms per hash
-  — deliberately slow enough to resist offline brute force, fast enough not
-  to degrade login UX. A random 16-byte salt is generated per password
-  (`randomBytes(16)`); the algorithm name and parameters are encoded
-  alongside the salt and hash (`scrypt$N=...,r=...,p=...$salt$hash`) so a
-  future parameter upgrade doesn't invalidate already-stored hashes. See
-  `src/auth.ts` `hashPassword`/`verifyPassword`.
+  `N=16384 (2^14), r=8, p=1` — OWASP's "limited memory/CPU" tier, costing
+  ~20-25ms per hash and ~16MB of scrypt's own working memory per call.
+  **This was deliberately lowered from an initial `N=131072` (OWASP's
+  dedicated-auth-server recommendation, ~128MB/call) after that setting
+  caused a real production outage during Crit 10 deployment verification**:
+  scrypt's memory cost is `128*N*r` bytes, so 128MB for one hash call alone
+  consumed roughly half of this app's 256MB Fly machine before Node's own
+  runtime, V8 heap, or `sharp`'s library even finished loading — and because
+  a dummy hash is computed once at module load (to equalize login timing
+  between existing and nonexistent accounts, see below), this happened on
+  *every single boot*, not just under load. The machine OOM-crash-looped
+  (`Out of memory: Killed process ... MainThread`, visible in `fly logs`)
+  until it hit Fly's max-restart count and gave up, serving 502s the whole
+  time. `N=16384` was chosen as the fix: still far above a fast general-
+  purpose hash's resistance to offline brute force, with ample headroom
+  under 256MB for everything else the process needs — see
+  `PROCESS.md`/`reflections/crit-10.md` for the full incident account. A
+  random 16-byte salt is generated per password (`randomBytes(16)`); the
+  algorithm name and parameters are encoded alongside the salt and hash
+  (`scrypt$N=...,r=...,p=...$salt$hash`) so a future parameter change
+  doesn't invalidate already-stored hashes. See `src/auth.ts`
+  `hashPassword`/`verifyPassword`.
 - **Sessions**: a 32-byte random token is generated at login
   (`randomBytes(32).toString("base64url")`) and set as an `HttpOnly`,
   `SameSite=Lax` cookie (`Secure` added when `NODE_ENV=production`, i.e.

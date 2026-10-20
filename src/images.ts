@@ -20,6 +20,17 @@ import { createImageRow, type ImageRow } from "./db.ts";
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? "./data/uploads";
 mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// This app runs on a single 256MB Fly machine (fly.toml) — sharp's default
+// concurrency (one decode thread per CPU core) is tuned for a dedicated
+// image-processing box, not a shared 256MB budget also running Node/V8 and
+// node:sqlite. Capped at 1 so concurrent uploads queue rather than each
+// spike memory simultaneously; a real production incident (an oversized
+// scrypt parameter, not this) already OOM-crashed this exact machine once
+// during Crit 10 deployment verification, so this is deliberate headroom,
+// not a guess. See docs/architecture/AUTH_AND_PERMISSIONS.md for that
+// incident's account.
+sharp.concurrency(1);
+
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB raw upload cap
 const MAX_DIMENSION = 4096;
 const MIN_DIMENSION = 64;

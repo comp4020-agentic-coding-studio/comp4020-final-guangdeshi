@@ -43,6 +43,16 @@ Buy or Pass uses distinct file paths (`DATABASE_PATH`, `UPLOAD_DIR` in
 `fly.toml`) on the same volume, so this pivot neither reads nor overwrites
 the previous product's data.
 
+The first live deployment attempt failed: the production machine
+crash-looped on out-of-memory kills and served 502s. The cause was
+`src/auth.ts`'s scrypt password-hashing parameters, carried over from the
+prototype unexamined — `N=131072` costs ~128MB per hash call, consuming
+roughly half of this app's 256MB Fly machine on every single boot (a dummy
+hash is computed at module load). Fixed by lowering to `N=16384`
+(~16MB/call), verified by constraining a local Node process's heap and
+confirming registration, login, and a real image upload all stayed well
+under budget. Full account in `PROCESS.md`, "A real production incident."
+
 ## What was the breakthrough that moved the work forward?
 
 *(Left for the student's own words — this is the part no account written on

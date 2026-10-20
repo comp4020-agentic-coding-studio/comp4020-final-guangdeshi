@@ -11,13 +11,20 @@ import {
   type User,
 } from "./db.ts";
 
-// scrypt parameters chosen to cost ~150-200ms per hash on typical hardware
-// (OWASP's current minimum recommendation is N=2^17 and p=1 for a dedicated
-// auth server); encoded alongside the hash so parameters can be upgraded
-// later without invalidating already-stored hashes.
-const SCRYPT_PARAMS = { N: 131072, r: 8, p: 1 } as const;
+// scrypt memory cost is 128*N*r bytes: N=131072 (OWASP's dedicated-
+// auth-server recommendation) needs ~128MB per call, which alone exceeds
+// half of this app's entire 256MB production machine (fly.toml) and was
+// the actual cause of a live OOM crash loop discovered during Crit 10
+// deployment verification — the machine restarted and died repeatedly
+// before Node even finished booting, since SCRYPT_MAXMEM had also been set
+// to the machine's full RAM with no headroom for Node/V8/sharp's own
+// footprint. N=16384 (OWASP's "limited memory/CPU" tier) needs ~16MB per
+// call, leaving ample headroom; SCRYPT_MAXMEM is set well above that one
+// call's need, not the whole machine. Encoded alongside the hash so
+// parameters can be upgraded later without invalidating stored hashes.
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 } as const;
 const KEY_LENGTH = 64;
-const SCRYPT_MAXMEM = 256 * 1024 * 1024;
+const SCRYPT_MAXMEM = 64 * 1024 * 1024;
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);

@@ -222,6 +222,21 @@ or reformats the volume, and never run a destructive `flyctl volumes`
 command against this app without the student's explicit, in-the-moment
 approval.
 
+## 22. This machine has 256MB total — verify memory, don't assume it
+
+A real production incident (see `PROCESS.md`, "A real production
+incident") crash-looped the live app on out-of-memory kills because
+`src/auth.ts`'s scrypt parameters, which never mattered on a development
+machine's effectively unlimited RAM, consumed roughly half of this app's
+actual 256MB budget on every single boot. Before changing anything that
+allocates non-trivial memory (crypto KDF parameters, image/buffer
+processing, an in-memory cache, a new dependency with its own native
+runtime), check its actual memory cost against 256MB minus Node's own
+baseline footprint — don't assume "it works locally" transfers, since local
+development machines have no comparable ceiling. Where feasible, verify
+with a constrained local run (`node --max-old-space-size=<N>`) before
+deploying, the way this incident's fix was actually confirmed.
+
 ---
 
 ## Current project state

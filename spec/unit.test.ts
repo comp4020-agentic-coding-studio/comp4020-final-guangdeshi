@@ -32,6 +32,21 @@ describe("password hashing", () => {
     expect(hash.startsWith("scrypt$N=")).toBe(true);
   });
 
+  it("keeps scrypt's memory cost (128*N*r bytes) well under this app's 256MB production machine", () => {
+    // Regression guard for a real incident (PROCESS.md, "A real production
+    // incident"): N=131072 cost ~128MB per hash call and alone crash-looped
+    // the live 256MB Fly machine on OOM kills, since a dummy hash is
+    // computed at module load on every boot. This asserts the actual
+    // parameter encoded in a fresh hash stays in a safe range rather than
+    // trusting a comment not to regress.
+    const hash = hashPassword("budget-check");
+    const match = hash.match(/^scrypt\$N=(\d+),r=(\d+),p=(\d+)\$/);
+    expect(match).not.toBeNull();
+    const [, nStr, rStr] = match!;
+    const memoryBytes = 128 * Number(nStr) * Number(rStr);
+    expect(memoryBytes).toBeLessThanOrEqual(32 * 1024 * 1024); // 32MB ceiling, well under 256MB total
+  });
+
   it("rejects malformed stored hashes rather than throwing", () => {
     expect(verifyPassword("anything", "not-a-real-hash")).toBe(false);
   });
