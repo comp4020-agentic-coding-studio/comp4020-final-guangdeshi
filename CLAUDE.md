@@ -1,25 +1,29 @@
 # Your harness
 
 This is the project harness for the **COMP4020/COMP8020 Final Project**
-("Bug Relay"): one repository, built across crits 8, 9, 10 and the final
+("Buy or Pass"): one repository, built across crits 8, 9, 10 and the final
 submission. What the product is and what "good" means for it belongs in
 `README.md`; this file holds the process rules the agent is held to while
 building it.
 
 This harness is a **deliberate merge-forward**, not a copy, from the Crit 7
 harness (`comp4020-crit7-GuangdeShi`), which was itself merged forward from
-Assignment 2. Everything below is a workflow/process rule that survived both
-merges because it doesn't depend on either prior project's product (a library
-room-booking redesign, a fictional course). Anything that was really
-Crit-7-specific — grounding claims in real ANU sources, preserving an existing
-system's interaction model — was dropped, since this project starts from
-nothing rather than extending something real.
+Assignment 2. Sections 1–12 below are workflow/process rules that have now
+survived two product pivots (Pick-Up Sticks → Bug Relay → Buy or Pass)
+because none of them depend on any one product.
 
-**Crit 8 → 9 pivot:** this repo's Crit 8 submission was a different product,
-"Pick-Up Sticks." For Crit 9 the product changed to Bug Relay — a deliberate,
-explicitly-confirmed decision, not a silent one; see `PROCESS.md` for the
-full reasoning. The process rules below (sections 1–12) are unaffected by the
-pivot, since none of them depended on Pick-Up Sticks' specific product.
+**Crit 8 → 9 pivot:** this repo's Crit 8 submission was "Pick-Up Sticks."
+For Crit 9 the product changed to Bug Relay — see `PROCESS.md` for that
+reasoning.
+
+**Crit 9 → Final pivot:** for the Final Project the product changed again,
+to Buy or Pass — a social shopping-opinion platform. See
+`docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md` and `PROCESS.md` for the
+full reasoning, what migrated from the isolated Buy or Pass prototype, and
+what was preserved from Bug Relay's own history. The process rules below
+(sections 1–12) are unaffected by this pivot either, since none of them
+depended on Bug Relay's specific product. Sections 13+ are Buy or Pass's own
+product-specific rules, carried in from the prototype's harness.
 
 ## 1. Audit before acting
 
@@ -131,25 +135,111 @@ or with the repo (code, code comments, commit messages, README, PROCESS.md,
 reflections, and any other submission-facing content) stays in English
 regardless of that preference.
 
+## 13. The Definition of Good governs every decision
+
+Buy or Pass's product argument is: *good advice is relevant, honest, and
+easy to give. The purchase belongs to the buyer. The opinions belong to the
+community.* Every architecture choice, UI copy decision, and test in this
+repo should trace back to that, not to generic CRUD-app best practice. When a
+feature request would compromise it (e.g. "just show an aggregate
+recommendation so the author doesn't have to read all the opinions"), name
+the conflict and don't silently take the easy path.
+
+## 14. Authentication says who; authorization says what — and authorization is server-side, always
+
+Every mutating route re-derives "who is calling" from the session cookie
+(`resolveSession` in `src/auth.ts`), never from a client-supplied user ID.
+Every route that changes or reveals user-scoped data checks ownership
+explicitly, in the handler, next to the action it guards. The concrete
+rules, enforced in `src/server.ts`:
+
+- A user may edit or delete only their **own** posts and opinions.
+- Only a post's **author** may record that post's purchase outcome.
+- A post's **author never submits an opinion on their own post** — by
+  design (see README "Buyer agency"), not an oversight.
+- Admin/observability routes (`/admin*`) require `isAdmin`, checked
+  server-side on every request, including the SSE log stream and the stats
+  API — never just hidden nav links.
+
+If you add a new mutating route, add its authorization check in the same
+function as the mutation, and add a test in `spec/posts-and-opinions.test.ts`
+that calls it as the *wrong* user and asserts a 403/404.
+
+## 15. One current opinion per (post, user) is a database guarantee
+
+`opinions` has a real `UNIQUE(post_id, user_id)` constraint, and
+`upsertOpinion` (`src/db.ts`) is a single `INSERT ... ON CONFLICT DO UPDATE`
+statement. Never "check if an opinion exists, then insert or update" as two
+separate statements — that reintroduces the race this schema exists to
+prevent. The full concurrency reasoning (why synchronous `node:sqlite`
+access makes this safe in a single process, and what a multi-process
+deployment would need instead) lives in
+`docs/architecture/DATA_MODEL.md`.
+
+## 16. Never fabricate counts, votes, or activity
+
+Per README "Honest results," Buy/Pass counts, opinion lists, and the admin
+stats page must always be computed live from the `opinions` table — never a
+cached or precomputed "engagement score," and never seeded with fake votes
+to make a demo post look more active.
+
+## 17. Structured logging: identifiers only, never content or secrets
+
+`src/logger.ts`'s `logEvent` is the only path that should write to
+`activity_events` or stdout for user actions. Never log: passwords, raw
+session cookie or CSRF token values, full email addresses, uploaded image
+bytes, or free-text content (comments, descriptions, reflections).
+
+## 18. Image uploads: never trust the declared type, never trust the client filename
+
+`src/images.ts`'s `processAndStoreImage` is the only path that writes an
+uploaded file to disk. It verifies the file is real by actually decoding it
+with `sharp`, re-encodes to JPEG (stripping EXIF/metadata as a side effect),
+and stores it under a server-generated opaque UUID filename.
+
+## 19. Unlisted is link-gated, not cryptographically private — say so
+
+An `unlisted` post is excluded from the feed/search/category browsing but is
+fully viewable by anyone with its URL. Don't let any UI copy imply unlisted
+posts are "private" or "secure" beyond that.
+
+## 20. The recommendation surface is a replaceable interface, not a model
+
+`src/recommendation/types.ts` defines `RecommendationService`;
+`src/recommendation/chronological.ts` is the only implementation, explicitly
+transparent (category/interest boost, no learned ranking). **Never** fold a
+user's BUY/PASS stance into their own interest/affinity signal — voting PASS
+on a product is not evidence the voter dislikes that category.
+
+## 21. Protect the Fly volume's Bug Relay data
+
+The live Fly volume still holds Bug Relay's SQLite database at
+`/data/bug-relay.db`, from before this pivot. Buy or Pass uses distinct
+paths (`DATABASE_PATH=/data/buyorpass.sqlite`, `UPLOAD_DIR=/data/uploads`,
+set in `fly.toml`). Never point Buy or Pass's own paths at
+`/data/bug-relay.db`, never write a migration or cleanup script that deletes
+or reformats the volume, and never run a destructive `flyctl volumes`
+command against this app without the student's explicit, in-the-moment
+approval.
+
 ---
 
 ## Current project state
 
 ```
-PRODUCT:   Bug Relay — real-time collaborative bug investigation. One live
-           case (Checkout Failure): participants run experiments against a
-           small deterministic fixture, results are persisted and broadcast
-           live, and a next-test algorithm recommends the most useful
-           untested condition. Two more built-in cases (Responsive Layout
-           Bug, Async State Bug) are named on the landing page but not yet
-           implemented — Crit 9 P1, deferred.
-STACK:     Plain Node.js (node:http, zero runtime npm dependencies) +
-           node:sqlite for persistence, Server-Sent Events for real-time
-           sync, TypeScript run directly (Node 24 type-stripping, no build
-           step). Rationale in PROCESS.md.
-STAGE:     Crit 9 — "All at once." Real-time sync (~1s, no reload),
-           persistent shared evidence, a documented concurrency ADR
-           (docs/adr/0001-concurrent-investigation-evidence.md), and a
-           unit-tested next-test algorithm are in place for the one live
-           case.
+PRODUCT:   Buy or Pass — a social shopping-opinion platform. A user posts a
+           purchase they're considering; other logged-in users give an
+           explicit 👍 Buy / 👎 Pass with a short comment; the author decides
+           independently and can later record Bought/Didn't Buy/Still
+           Deciding. Migrated from an isolated, fully-verified prototype —
+           see docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md.
+STACK:     TypeScript on Node 24 (type-stripping, no build step), node:sqlite
+           for persistence, Server-Sent Events for real-time sync, plus two
+           small npm dependencies (sharp, busboy) for verified image upload
+           handling. Rationale in PROCESS.md.
+STAGE:     Final Project / Crit 10 — "Fly by instruments." Server-side
+           authorization, structured activity logging, a protected
+           observability page, and the two-person realtime rehearsal are in
+           place; see reflections/crit-10.md and
+           docs/architecture/C10_REHEARSAL.md.
 ```

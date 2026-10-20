@@ -25,6 +25,12 @@ dockerfile = "Dockerfile"
 
 [env]
 PORT = "8080"
+# Buy or Pass's own paths on the shared /data volume — deliberately distinct
+# from the prior Bug Relay product's /data/bug-relay.db, so this pivot never
+# reads, writes, or deletes that earlier product's data (see
+# docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md, "Data preservation").
+DATABASE_PATH = "/data/buyorpass.sqlite"
+UPLOAD_DIR = "/data/uploads"
 
 [http_service]
 internal_port = 8080

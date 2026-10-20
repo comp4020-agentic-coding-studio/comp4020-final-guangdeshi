@@ -1,6 +1,7 @@
 {
-  // Covers the supplied harness (spec/, scripts/); widen `include` if your app
-  // is TypeScript and you want `pnpm typecheck` to cover it too.
+  // Covers the supplied harness (spec/, scripts/) plus src/ (TypeScript
+  // backend only — src/public/**/*.js is plain browser JS, left out
+  // implicitly since tsc only resolves .ts/.tsx under `include` by default).
   "compilerOptions": {
     "target": "ES2023",
     "module": "ESNext",

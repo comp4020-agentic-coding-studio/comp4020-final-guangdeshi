@@ -4,12 +4,22 @@
   "type": "module",
   "scripts": {
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "dev": "node src/server.ts",
+    "dev:test": "RATE_LIMIT_SCALE=1000 DATABASE_PATH=./data/buyorpass.test.sqlite UPLOAD_DIR=./data/uploads-test node src/server.ts",
     "typecheck": "tsc --noEmit",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "node scripts/verify-browser.mjs",
+    "test:admin": "node scripts/verify-admin.mjs",
+    "screenshots": "node scripts/screenshot-demo.mjs"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^24.0.0",
     "jsdom": "^30.1.0",

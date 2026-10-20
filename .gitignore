@@ -2,6 +2,14 @@ node_modules/
 dist/
 *.log
 
+# Buy or Pass's local runtime state: the SQLite database and uploaded
+# images (fly.toml points these at /data in production; locally they land
+# here), plus local screenshot/test output. None of this is source.
+data/
+screenshots/
+playwright-report/
+test-results/
+
 # editor and OS junk
 .DS_Store
 ._*

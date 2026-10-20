@@ -59,3 +59,26 @@ it("publishes README.md at /readme/", async () => {
     from = at + normalise(heading).length;
   }
 });
+
+// Carried over from the Buy or Pass prototype's own invariants.test.ts
+// (docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md): basic sanity the course
+// template didn't already assert.
+it("serves a page with a real title and a mobile viewport meta tag", async () => {
+  const res = await fetch(new URL("/", baseUrl));
+  const html = await res.text();
+  const dom = new JSDOM(html);
+  expect(dom.window.document.title.trim().length).toBeGreaterThan(0);
+  const viewport = dom.window.document.querySelector('meta[name="viewport"]');
+  expect(viewport).not.toBeNull();
+});
+
+it("rejects a request with no matching route as 404, not a silent 200", async () => {
+  const res = await fetch(new URL("/this-route-does-not-exist", baseUrl));
+  expect(res.status).toBe(404);
+});
+
+it("healthz reports ok", async () => {
+  const res = await fetch(new URL("/healthz", baseUrl));
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ ok: true });
+});

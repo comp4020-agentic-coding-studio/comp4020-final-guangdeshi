@@ -1,149 +1,118 @@
 # Process overview
 
-### Crit 8 — Pick-Up Sticks
+## What this project is, and how it got here
 
-For Crit 8, I deliberately built a very small proof of life instead of a
-complete multiplayer game.
+This repository has carried three products across three crits: Pick-Up
+Sticks (Crit 8), Bug Relay (Crit 9), and now Buy or Pass (Final Project) — a
+social shopping-opinion platform where a user posts a purchase they're
+considering and other logged-in users give an explicit 👍 Buy / 👎 Pass
+opinion with a short comment, while the author decides independently. Each
+pivot is a deliberate, confirmed decision, not a drift: Crit 8 → 9 is
+recorded in this file's git history and `docs/adr/0001-concurrent-
+investigation-evidence.md`; the Crit 9 → Final pivot is recorded in
+`docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md`. What carried forward
+across all three: this repository's git history, its Fly.io app and volume,
+and the plain-Node/`node:sqlite`/no-build-step stack decision from Crit 8.
+What didn't: the product code itself, each time.
 
-I chose Pick-Up Sticks because the core interaction is simple: a visitor
-removes one stick, and that change remains for the next visitor.
+## Why Buy or Pass was built as an isolated prototype first
 
-I considered features such as realistic physics, collision detection,
-realtime multiplayer, accounts, scoring, and more complex rules, but I
-excluded them because they were not necessary to prove the main interaction.
+Rather than iterating on the new product directly in this repository, it was
+built and fully verified as a separate, independent project before any file
+here was touched — its own git repository, never sharing a working
+directory or Fly deployment with this repo. This repo's own `CLAUDE.md`
+(section 5) requires actually exercising a feature before calling it done,
+and doing that iteration here would mean either a slow feedback loop (every
+push can trigger a real CI run and a real Fly deployment) or skipping
+verification to avoid it. The prototype let the full feature set be built,
+broken, and fixed freely, so what migrated in already had 72 automated
+tests passing, full Playwright browser verification across two independent
+browser contexts, measured real-time propagation latency, and a confirmed
+restart-persistence check.
 
-The pile contains 24 sticks with fixed positions, rotations, lengths, and
-z-index values. Instead of physical collision detection, only the highest
-remaining stick can be removed.
+## Stack
 
-Commit
-[`8e3fb97`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8e3fb97)
-added the deterministic layout, server, and SQLite persistence. Removed
-sticks are stored in the database, so they remain gone after reloads and
-server restarts.
+TypeScript on Node 24, run directly via Node's built-in type-stripping (no
+build step, no bundler) — continuing Crit 8/9's decision. `node:sqlite` for
+persistence, Server-Sent Events for real-time sync (chosen because every
+live event here — a new opinion, an updated count — is server→client only;
+WebSockets would add protocol complexity this product doesn't need). Two
+small, actively maintained npm dependencies are new in this pivot: `sharp`
+(image decoding, re-encoding, and metadata stripping) and `busboy`
+(multipart form parsing) — added because correct, security-reviewed image-
+upload handling is worth a real dependency rather than a hand-rolled parser,
+unlike Bug Relay, which needed no file uploads at all.
 
-Commit
-[`484eca1`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/484eca1)
-added tests for persistence, duplicate removal, and invalid removal.
+## What migrated, and what was adapted versus kept
 
-Commit
-[`f89a449`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/f89a449)
-consolidated the README, PROCESS, and Crit 8 reflection.
+The prototype's `src/`, its own `spec/*.test.ts` files (added alongside,
+not replacing, this repo's fixed `spec/invariants.test.ts`/
+`global-setup.ts`/`README.md`), and its `docs/product/`, `docs/design/`,
+`docs/architecture/`, and `docs/research/` trees all moved in.
+`fly.toml`/`Dockerfile` were adapted, not replaced: the existing
+`fly.toml` kept its region/machine/volume shape, gaining only
+`DATABASE_PATH`/`UPLOAD_DIR` entries pointed at new filenames so Bug Relay's
+existing `/data/bug-relay.db` on the live volume is never read or
+overwritten; the Dockerfile gained a real `pnpm install` stage for the two
+new runtime dependencies. `package.json` kept this repo's name and script
+conventions. Bug Relay's own product code and product-specific specs were
+removed from the working tree — fully recoverable from git history, the
+`crit-8` tag, and the `backup/pre-buy-or-pass-migration-20261021` branch
+pushed to origin before migration began.
+`docs/adr/0001-concurrent-investigation-evidence.md` was kept untouched
+alongside the new `0002`, since it documents a real decision this
+repository's history actually made.
 
-The main lesson was that I did not need to build the whole multiplayer
-system to prove the idea. A small persistent interaction was enough to show
-that one visitor can change what the next visitor sees.
+## Protecting prior history before migrating
 
-### Crit 9 — pivot to Bug Relay, "All at once"
+Before any file was changed: the original `HEAD`
+(`de6309b3eabd748abb72c74ea5327ab983965548`) was recorded, a backup branch
+was created from it and pushed to `origin`, a full `git bundle --all`
+backup was made and restore-tested, and the repository's one pre-existing
+uncommitted change — the student's own first-person edits to
+`reflections/crit-9.md` — was independently exported as a patch and a plain
+copy before being confirmed still present in the working tree, untouched.
 
-**The pivot.** Going into Crit 9, I replaced Pick-Up Sticks with a different
-product entirely: Bug Relay, a real-time collaborative bug-investigation
-tool. This was a deliberate decision, not a drift — I confirmed it explicitly
-before any code changed, specifically because this repo's own `CLAUDE.md`
-(decision boundary, section 2) requires naming a product-direction change
-rather than silently picking one. I kept everything about Pick-Up Sticks that
-wasn't the product itself: git history, the Fly.io app and its token/volume,
-the CI pipeline, the plain-Node/`node:sqlite`/no-build-step stack decision
-from Crit 8. `src/sticks.ts` and the `removed_sticks` table were removed
-outright (the latter via a one-time `DROP TABLE IF EXISTS` in `src/db.ts`)
-since nothing in Bug Relay references them.
+## C10 ("Fly by instruments") implementation
 
-**Scope for this crit.** The product brief describes three built-in
-investigation cases; I built exactly one (Checkout Failure) completely rather
-than three partially, per the brief's own stated priority order and this
-repo's scope-control rule (`CLAUDE.md` section 11). The other two are named
-on the landing page, visibly marked "coming soon," so the product's intended
-shape is legible without claiming functionality that doesn't exist yet.
+Server-side authorization is checked inline in each mutating route handler
+(`src/server.ts`), deriving the caller's identity only from the session
+cookie, never a client-supplied id — covering post/opinion ownership, the
+author-can't-vote-on-own-post rule, and admin-only access to `/admin*`.
+Structured activity logs (`src/logger.ts`) write one JSON line per
+meaningful action to stdout and to an `activity_events` table, carrying a
+request id, a truncated pseudonymous user id, the action, target, status,
+and latency — never passwords, tokens, full emails, or free-text content. A
+protected `/admin` page streams this log live over SSE and shows active-
+user/event/failure counts and open reports with resolve/dismiss controls.
+The one current-opinion-per-(post,user) rule is a real `UNIQUE` database
+constraint plus a single `INSERT ... ON CONFLICT DO UPDATE` statement, not
+an application-level check — see `docs/architecture/DATA_MODEL.md` for why
+this is also the concurrency-safety mechanism under simultaneous
+submissions. The two-person rehearsal procedure is in
+`docs/architecture/C10_REHEARSAL.md` and `reflections/crit-10.md`.
 
-**What "good" meant for the concurrency decision.** The brief requires one
-real decision about multi-user behaviour, benchmarked against this project's
-own Definition of Good, not generic best practice. I chose **append-only
-evidence**: every experiment submission is retained forever, including exact
-duplicates, and the evidence board, hypothesis consistency, and
-recommendation are always recomputed from the full persisted record rather
-than stored as separately-mutable state. The alternative I seriously
-considered and rejected was a single mutable "current leading hypothesis"
-field, updated as evidence came in. I rejected it because it directly
-contradicts two lines of the stated Good definition: "results can be
-repeated" (a mutable field has no room for a confirming duplicate — it would
-have nothing to overwrite) and "the system does not claim a definitive root
-cause from insufficient evidence" (a mutable "current best" field reads as an
-answer the moment it's non-null, which pushes toward premature certainty).
-The full reasoning, including the drawbacks of the choice I made and the
-conditions that would justify revisiting it, is in
-`docs/adr/0001-concurrent-investigation-evidence.md`.
+## Data preservation on the shared Fly volume
 
-**The next-test algorithm.** I implemented expected information gain
-(Shannon entropy reduction in bits, uniform prior over the hypotheses still
-consistent with the evidence) over a small, fixed, predefined hypothesis set
-per case — the brief's own suggested approach, chosen over a heuristic
-because the hypothesis space is small enough (5 hypotheses, 8 combinations
-for this case) that the exact computation is cheap and exactly verifiable.
-`spec/recommend.test.ts` checks the first recommendation's score against a
-hand-computed value
-(`log2(5) - (0.4·log2(2) + 0.6·log2(3)) ≈ 0.971` bits) rather than just
-trusting the implementation. `scripts/simulate-recommendations.ts` is a
-deterministic offline comparison against two baselines on the real fixture;
-run output (not invented numbers):
+The existing volume (`vol_vgnkkg7wp5z92714`) still holds Bug Relay's
+`/data/bug-relay.db`. Buy or Pass's `fly.toml` configuration points it at
+`/data/buyorpass.sqlite` and `/data/uploads/` instead — distinct paths on
+the same volume, so the prior product's data is neither read nor
+overwritten by this deploy. No migration script runs against the old
+database, since the two products share no schema.
 
-```
-Info-gain recommendation strategy: 3 experiments
-Fixed canonical-order strategy:     6 experiments
-Random-untested-combo strategy:    mean 4.81 (min 3, max 7) over 200 seeded trials
-```
+## Verification
 
-The script's own printed caveat is load-bearing: 8 combinations is far too
-small a space to support a general statistical claim — this is one
-reproducible run on one fixture, not a benchmark result, and I'm not
-claiming otherwise.
-
-**Real-time transport.** Server-Sent Events, not WebSockets. This keeps the
-zero-runtime-npm-dependency property from the Crit 8 stack decision (native
-`EventSource` client-side, plain `node:http` `text/event-stream`
-server-side, `src/sse.ts`) — the brief itself says the transport mechanism
-isn't graded, only the observed ~1-second, no-reload behaviour is, so I
-optimized for keeping the existing stack decision coherent rather than
-reaching for a new dependency.
-
-**Commits.** [`a9e148c`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a9e148c)
-is the product pivot itself: the Checkout Failure fixture and hypothesis set
-(`src/cases/`), server-authoritative persistence (`src/db.ts`), the
-landing/room pages and their client script (`src/pages.ts`, `src/ui.ts`),
-and the routes (`src/server.ts`), with `src/sticks.ts` removed.
-[`4230c73`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4230c73)
-adds the test suite: pure unit tests for the fixture and algorithm
-(`spec/recommend.test.ts`) and HTTP-level tests against the running app
-covering persistence, two independent participants, concurrent and duplicate
-submissions, reveal, reset, and SSE delivery (`spec/bug-relay.test.ts`),
-removing the now-obsolete `spec/pick-up-sticks.test.ts`.
-[`da4c5b5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/da4c5b5)
-adds the concurrency ADR and the baseline-comparison simulation script.
-[`53fd62a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/53fd62a)
-is a real bug found during browser verification, not a planned step: at
-390px width the 5-column evidence table forced the whole page to scroll
-horizontally (`document.documentElement.scrollWidth` measured 515px against
-a 390px viewport). Fixed by scrolling the table within its own container
-instead of letting it push the page wide; re-measured at 390px after the fix.
-
-**Verification.** `pnpm check` (31 tests across `spec/recommend.test.ts`,
-`spec/bug-relay.test.ts`, and the shipped `spec/invariants.test.ts`, plus
-`tsc --noEmit`) passes against a locally-run instance. Docker was not
-available in the local development environment this session ran in, so the
-Dockerfile build itself was checked by inspection (it only copies `src/` and
-`README.md`, both of which are everything the app needs — confirmed by
-grepping for any reference outside those paths) rather than executed
-locally; CI's `checks.yml` job runs the real build-and-test-the-image step on
-push, which is the first execution of that exact path. Real-browser
-verification used Playwright (added as a devDependency only — the Dockerfile
-never runs `pnpm install`, so it doesn't reach the deployed image) driving
-the system's installed Google Chrome via the `chrome` channel, with two
-independent `BrowserContext`s (distinct cookies, distinct participants)
-against the same room: a passing and a failing experiment from each side
-updated the other side's evidence board, hypothesis list, and recommendation
-within roughly a second with no reload; a reload of one context preserved
-its evidence; a concurrent pair of submissions (one from each context, fired
-together) both persisted as separate rows; desktop (1920×1080) and mobile
-(390×844) were both checked for the landing page and the investigation room,
-which is what surfaced and confirmed the fix for the mobile table-overflow
-bug above. Screenshots from this pass were reviewed directly, not just
-asserted from code.
+`pnpm check` (typecheck plus the full `spec/` suite) passes against a
+locally-run instance. Real-browser verification used Playwright driving
+Chromium through two independent browser contexts
+(`scripts/verify-browser.mjs`, `scripts/verify-admin.mjs`): registration,
+post creation with an uploaded image, a second user's opinion appearing on
+the first user's already-open page without a reload, a stance change
+updating counts live, a purchase outcome being recorded, server-side
+authorization denials, the admin log updating live, and the report/resolve
+flow — all measured and screenshotted, not just asserted from code. A
+server-restart test confirmed users, posts, opinions, and images all survive
+restart identically. Live deployment verification against the actual
+`comp4020-final-guangdeshi.fly.dev` URL is recorded separately once
+performed, since local Playwright results don't substitute for it.

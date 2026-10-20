@@ -1,47 +1,65 @@
+// Server-Sent Events hub. SSE (not WebSockets) because every event here is
+// server -> client only (a post's opinions/counts changed, a new activity
+// log line arrived); the client never needs to push a stream back, so SSE's
+// plain-HTTP, auto-reconnecting model is the simpler sufficient choice.
+//
+// Two independent channels:
+//  - post rooms: clients viewing a specific post's detail page subscribe to
+//    that post's id, so a Buy/Pass update reaches only viewers of that post.
+//  - the admin log stream: a separate broadcast for the observability page.
 import type { ServerResponse } from "node:http";
+import type { ActivityEvent } from "./db.ts";
 
-// Live, in-memory presence/broadcast only — explicitly separate from the
-// SQLite evidence in db.ts. If the process restarts, every connection drops
-// and reconnects (client-side EventSource retries automatically); nothing
-// here needs to survive that, since the authoritative state it announces is
-// always re-fetched from the database on (re)connect, never reconstructed
-// from this registry.
-const rooms = new Map<string, Set<ServerResponse>>();
-
-export function subscribe(caseId: string, res: ServerResponse): () => void {
-  let set = rooms.get(caseId);
-  if (!set) {
-    set = new Set();
-    rooms.set(caseId, set);
-  }
-  set.add(res);
-  return () => {
-    set!.delete(res);
-    if (set!.size === 0) rooms.delete(caseId);
-  };
+interface PostClient {
+  res: ServerResponse;
+  postId: string;
 }
 
-export function presenceCount(caseId: string): number {
-  return rooms.get(caseId)?.size ?? 0;
-}
+const postClients = new Set<PostClient>();
+const logClients = new Set<ServerResponse>();
 
-export function broadcast(caseId: string, event: string, data: unknown): void {
-  const set = rooms.get(caseId);
-  if (!set || set.size === 0) return;
-  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of set) {
-    res.write(payload);
-  }
-}
-
-export function sseHeaders(): Record<string, string> {
-  return {
+function startStream(res: ServerResponse): void {
+  res.writeHead(200, {
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache, no-transform",
+    "Cache-Control": "no-cache",
     Connection: "keep-alive",
-    // Fly's proxy (and some reverse proxies in general) buffer by default;
-    // this disables that so events actually flush within the ~1s budget
-    // rather than arriving in a batch when the buffer fills.
     "X-Accel-Buffering": "no",
-  };
+  });
+  res.write(":ok\n\n");
+}
+
+export function addPostClient(res: ServerResponse, postId: string): void {
+  startStream(res);
+  const entry: PostClient = { res, postId };
+  postClients.add(entry);
+  res.on("close", () => postClients.delete(entry));
+}
+
+export function broadcastToPost(postId: string, event: string, data: unknown): void {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of postClients) {
+    if (client.postId === postId) client.res.write(payload);
+  }
+}
+
+export function addLogClient(res: ServerResponse): void {
+  startStream(res);
+  logClients.add(res);
+  res.on("close", () => logClients.delete(res));
+}
+
+export function broadcastLog(event: Omit<ActivityEvent, "id">): void {
+  const payload = `event: activity\ndata: ${JSON.stringify(event)}\n\n`;
+  for (const res of logClients) res.write(payload);
+}
+
+export function startHeartbeat(intervalMs = 20000): NodeJS.Timeout {
+  return setInterval(() => {
+    for (const client of postClients) client.res.write(":hb\n\n");
+    for (const res of logClients) res.write(":hb\n\n");
+  }, intervalMs);
+}
+
+export function sseClientCounts(): { postViewers: number; logViewers: number } {
+  return { postViewers: postClients.size, logViewers: logClients.size };
 }

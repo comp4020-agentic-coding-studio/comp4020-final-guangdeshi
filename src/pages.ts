@@ -1,401 +1,572 @@
-import type { CaseDef, CaseSummary } from "./cases/types.ts";
-import { pageShell } from "./ui.ts";
+// Server-rendered page bodies. Each function returns the <body>-level HTML
+// that render.ts's layout() wraps with nav/footer/head. Kept as plain
+// template strings (no templating engine) to match the zero-framework stack;
+// every user-authored string passed through escapeHtml() before interpolation.
+import type { Category, Opinion, OpinionWithAuthor, Post, PostOutcome, User } from "./db.ts";
+import { escapeHtml } from "./validation.ts";
+import {
+  categoryOptions,
+  emptyState,
+  flashBanner,
+  formatPrice,
+  layout,
+  outcomeBadge,
+  postCard,
+  stanceBadge,
+  timeAgo,
+  type ViewerContext,
+} from "./render.ts";
 
-// The three built-in cases the brief asks for. Only "checkout-failure" is
-// implemented for Crit 9 (P0: one complete case beats three unfinished
-// ones); the other two are listed so the product's shape is visible, but
-// are not clickable.
-export const PLANNED_CASES: CaseSummary[] = [
-  { id: "checkout-failure", title: "Checkout Failure", tagline: "A valid order is sometimes rejected under a specific combination of conditions." },
-  { id: "responsive-layout", title: "Responsive Layout Bug", tagline: "At one viewport width, an important action becomes unusable. Other widths work." },
-  { id: "async-state", title: "Async State Bug", tagline: "Out-of-order async responses leave the UI showing a stale result." },
-];
+// --------------------------------------------------------------- landing --
 
-const LIVE_CASE_IDS = new Set(["checkout-failure"]);
-
-export function landingPage(): string {
-  const cards = PLANNED_CASES.map((c) => {
-    const live = LIVE_CASE_IDS.has(c.id);
-    return live
-      ? `<a class="card case-card enter" href="/cases/${c.id}"><span class="badge badge-pass" style="margin-bottom:8px;">live case</span><h3>${c.title}</h3><p>${c.tagline}</p></a>`
-      : `<div class="card case-card" aria-disabled="true"><span class="badge badge-dim" style="margin-bottom:8px;">coming soon</span><h3>${c.title}</h3><p>${c.tagline}</p></div>`;
-  }).join("\n");
-
+export function landingPage(viewer: ViewerContext, featured: Array<{ post: Post; coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number }>): string {
   const body = `
-<header class="hero">
-  <h1>Bug Relay</h1>
-  <p class="tagline">Find the condition. Fix the mystery. Together.</p>
-  <p class="lede">
-    A web app misbehaves under some combination of conditions. One person can't
-    reproduce what another person saw. Bug Relay turns that into a shared,
-    structured investigation: you and your collaborators run controlled
-    experiments against a real small fixture, every result is recorded and
-    broadcast live, and the system recommends which untested condition would
-    rule out the most remaining explanations &mdash; so the next test is always
-    clearer than the last one.
-  </p>
-  <div class="cta-row">
-    <a class="btn btn-primary" href="/cases/checkout-failure">Start investigating</a>
-    <a class="btn btn-ghost" href="/cases/checkout-failure">Join a session</a>
-  </div>
-  <p class="lede" style="font-size:0.85rem;">
-    There is one live case right now &mdash; Checkout Failure. Opening it either
-    starts the shared investigation or joins whatever evidence others have
-    already collected; the room's URL is the same either way.
-  </p>
-</header>
-<div class="wrap">
-  <section class="section">
-    <h2>Three controlled cases</h2>
-    <div class="case-grid">
-      ${cards}
+<section class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">A friendly community for purchase decisions</p>
+    <h1 class="hero-title">You want it.<br/>What does everyone else think?</h1>
+    <p class="hero-sub">Post what you're thinking about buying. Real people give you a quick 👍 Buy or 👎 Pass with a short honest opinion. You still make the call.</p>
+    <div class="hero-actions">
+      <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand btn-large">Post something you're eyeing</a>
+      <a href="/discover" class="btn btn-ghost btn-large">Explore opinions</a>
     </div>
-  </section>
-  <section class="section card">
-    <h2 style="margin-top:0;">How collaborative debugging works here</h2>
-    <p style="color:var(--text-dim);">
-      Each case is a small, deterministic fixture with a real (but hidden)
-      cause. You pick a combination of test conditions, run it in the
-      embedded playground, and the app automatically records what happened
-      &mdash; not an arbitrary pass/fail you type in yourself. Every
-      participant watching the same case sees new evidence appear within
-      about a second, with no reload, and the recommended next test updates
-      as the evidence narrows down which explanations are still possible.
-      Bug Relay never claims a definitive cause from insufficient evidence:
-      the "reveal" for a case only becomes available once the evidence
-      actually narrows to a single remaining explanation.
-    </p>
-  </section>
-</div>
-<footer class="app">Bug Relay &mdash; a COMP4020/COMP8020 Final Project. <a href="/readme/">Read more</a>.</footer>`;
-  return pageShell({ title: "Bug Relay — find the condition, fix the mystery, together", body });
-}
-
-export function caseNotFoundPage(caseId: string): string {
-  const body = `
-<div class="wrap">
-  <h1>No such case: ${caseId}</h1>
-  <p><a class="btn btn-primary" href="/">Back to all cases</a></p>
-</div>`;
-  return pageShell({ title: "Case not found — Bug Relay", body });
-}
-
-export interface RoomBootstrap {
-  participant: { id: string; displayName: string | null };
-  caseDef: {
-    id: string;
-    title: string;
-    tagline: string;
-    reproductionGoal: string;
-    variables: { key: string; label: string; options: { value: string; label: string }[] }[];
-    hypotheses: { id: string; label: string }[];
-  };
-  state: RoomStateBootstrap;
-}
-
-export interface RoomStateBootstrap {
-  experiments: {
-    id: number;
-    participantId: string;
-    participantName: string;
-    params: Record<string, string>;
-    expectedResult: string;
-    actualResult: string;
-    passed: boolean;
-    note: string | null;
-    createdAt: string;
-  }[];
-  recommendation: {
-    status: "insufficient" | "narrowing" | "identified";
-    consistentHypothesisIds: string[];
-    testedCount: number;
-    totalCombos: number;
-    next: { params: Record<string, string>; comboKey: string; expectedInfoGainBits: number } | null;
-    explanation: string;
-  };
-  presence: number;
-}
-
-export function roomPage(bootstrap: RoomBootstrap): string {
-  const { caseDef } = bootstrap;
-  const body = `
-<div class="wrap">
-  <div class="room-header">
-    <div>
-      <h1 style="margin-bottom:4px;">${caseDef.title}</h1>
-      <p style="color:var(--text-dim); margin:0;">${caseDef.reproductionGoal}</p>
+    <div class="hero-howitworks">
+      <div class="howitworks-step"><span class="step-num">1</span><div><strong>Post it</strong><p>Photos, price, and why you're considering it.</p></div></div>
+      <div class="howitworks-step"><span class="step-num">2</span><div><strong>Get real opinions</strong><p>👍 Buy or 👎 Pass, plus one honest sentence.</p></div></div>
+      <div class="howitworks-step"><span class="step-num">3</span><div><strong>You decide</strong><p>The purchase is always yours to make.</p></div></div>
     </div>
-    <div class="presence mono" id="presence"><span class="dot" aria-hidden="true"></span><span id="presence-count">connecting&hellip;</span></div>
   </div>
+</section>
 
-  <section class="section card" aria-label="Your identity in this room">
-    <div id="name-section"></div>
-  </section>
+<section class="section">
+  <div class="section-header">
+    <h2>Fresh purchasing questions</h2>
+    <a href="/discover" class="link-more">See all →</a>
+  </div>
+  ${featured.length > 0
+    ? `<div class="post-grid">${featured.map((f) => postCard(f.post, f)).join("\n")}</div>`
+    : emptyState({ icon: "🛍️", title: "No posts yet", body: "Be the first to ask the community: buy or pass?", actionHref: viewer.user ? "/posts/new" : "/register", actionLabel: "Create the first post" })}
+</section>
 
-  <section class="section card">
-    <h2 style="margin-top:0;">Test playground</h2>
-    <form id="playground-form">
-      <div class="playground-grid" id="playground-fields"></div>
-      <label for="note">Note (optional)</label>
-      <textarea id="note" name="note" placeholder="Anything you noticed about this run"></textarea>
-      <p style="margin-top:12px;">
-        <button class="btn btn-primary" type="submit" id="run-btn">Run experiment</button>
-      </p>
+<section class="section section-definition">
+  <div class="definition-card">
+    <h2>Good advice is relevant, honest, and easy to give.</h2>
+    <p>The purchase belongs to the buyer. The opinions belong to the community. Every opinion takes an explicit stance, nobody can decide for you, and counts always reflect real votes — never fabricated ones.</p>
+    <a href="/readme/" class="link-more">Read our full Definition of Good →</a>
+  </div>
+</section>`;
+  return layout({ title: "Buy or Pass", viewer, body, bodyClass: "page-landing" });
+}
+
+// --------------------------------------------------------------- auth -----
+
+export function registerPage(viewer: ViewerContext, error: string | null, values: { email?: string; handle?: string; displayName?: string }): string {
+  const body = `
+<section class="auth-section">
+  <div class="auth-card">
+    <h1>Create your account</h1>
+    <p class="muted">Join the community giving (and getting) honest buy-or-pass opinions.</p>
+    ${flashBanner(error)}
+    <form method="post" action="/register" class="form-stack" novalidate>
+      <label>Email
+        <input type="email" name="email" required maxlength="254" autocomplete="email" value="${escapeHtml(values.email ?? "")}" />
+      </label>
+      <label>Handle
+        <input type="text" name="handle" required minlength="3" maxlength="30" pattern="[a-z0-9_-]+" placeholder="lowercase, no spaces" autocomplete="username" value="${escapeHtml(values.handle ?? "")}" />
+      </label>
+      <label>Display name
+        <input type="text" name="displayName" required maxlength="60" value="${escapeHtml(values.displayName ?? "")}" />
+      </label>
+      <label>Password
+        <input type="password" name="password" required minlength="8" maxlength="256" autocomplete="new-password" />
+        <span class="hint">At least 8 characters.</span>
+      </label>
+      <button type="submit" class="btn btn-brand btn-large btn-block">Create account</button>
     </form>
-    <div id="result-readout" class="result-readout" hidden></div>
-  </section>
-
-  <section class="section card">
-    <h2 style="margin-top:0;">Next-test recommendation</h2>
-    <div id="recommend-container"></div>
-  </section>
-
-  <section class="section card">
-    <h2 style="margin-top:0;">Candidate explanations</h2>
-    <ul class="hyp-list" id="hyp-list"></ul>
-    <div id="reveal-container" style="margin-top:14px;"></div>
-  </section>
-
-  <section class="section card">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <h2 style="margin-top:0;">Shared evidence board</h2>
-      <button class="btn btn-ghost" id="reset-btn" type="button">Reset this investigation</button>
-    </div>
-    <div id="evidence-container"></div>
-  </section>
-</div>
-<footer class="app"><a href="/">&larr; All cases</a></footer>
-<script type="application/json" id="bootstrap">${JSON.stringify(bootstrap)}</script>
-<script>${ROOM_CLIENT_SCRIPT}</script>`;
-  return pageShell({ title: `${caseDef.title} — Bug Relay`, body });
+    <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+  </div>
+</section>`;
+  return layout({ title: "Join Buy or Pass", viewer, body, bodyClass: "page-auth" });
 }
 
-// Vanilla JS, no bundler/framework — consistent with this repo's existing
-// stack decision. Owns rendering of every dynamic section from a single
-// state object, re-rendered wholesale on each SSE "state" event: at this
-// fixture's scale (a handful of experiments, 8 combinations) a full
-// re-render is simple, correct, and cheap, and it means there is exactly
-// one place (here) that turns evidence into DOM, instead of a server
-// renderer and a client patcher that could drift apart.
-const ROOM_CLIENT_SCRIPT = `
-(function () {
-  var bootstrap = JSON.parse(document.getElementById('bootstrap').textContent);
-  var caseId = bootstrap.caseDef.id;
-  var me = bootstrap.participant;
-  var caseDef = bootstrap.caseDef;
-  var lastExperimentId = null;
+export function loginPage(viewer: ViewerContext, error: string | null, values: { email?: string }): string {
+  const body = `
+<section class="auth-section">
+  <div class="auth-card">
+    <h1>Welcome back</h1>
+    <p class="muted">Log in to post, vote, and track your activity.</p>
+    ${flashBanner(error)}
+    <form method="post" action="/login" class="form-stack" novalidate>
+      <label>Email
+        <input type="email" name="email" required autocomplete="email" value="${escapeHtml(values.email ?? "")}" />
+      </label>
+      <label>Password
+        <input type="password" name="password" required autocomplete="current-password" />
+      </label>
+      <button type="submit" class="btn btn-brand btn-large btn-block">Log in</button>
+    </form>
+    <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
+  </div>
+</section>`;
+  return layout({ title: "Log in", viewer, body, bodyClass: "page-auth" });
+}
 
-  function el(html) {
-    var t = document.createElement('template');
-    t.innerHTML = html.trim();
-    return t.content.firstElementChild;
-  }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
-  function fmtParams(params) {
-    return caseDef.variables.map(function (v) { return v.label + '=' + params[v.key]; }).join(', ');
-  }
-  function fmtTime(iso) {
-    try { return new Date(iso).toLocaleTimeString(); } catch (e) { return iso; }
-  }
+// ------------------------------------------------------------ discover ----
 
-  // --- name section ---
-  function renderName() {
-    var container = document.getElementById('name-section');
-    if (me.displayName) {
-      container.innerHTML =
-        '<p style="margin:0;">Investigating as <strong>' + escapeHtml(me.displayName) + '</strong> &middot; ' +
-        '<button class="btn btn-ghost" id="edit-name-btn" type="button" style="padding:4px 10px;">change name</button></p>';
-      document.getElementById('edit-name-btn').addEventListener('click', function () {
-        me.displayName = null;
-        renderName();
-      });
-    } else {
-      container.innerHTML =
-        '<form id="name-form" class="name-form">' +
-        '<label for="display-name" style="margin:0;">Display name</label>' +
-        '<input type="text" id="display-name" name="displayName" maxlength="40" required placeholder="e.g. Alice" autocomplete="off" />' +
-        '<button class="btn btn-primary" type="submit">Join as this name</button>' +
-        '</form><p style="color:var(--text-dim); font-size:0.85rem; margin:8px 0 0;">You can look around without a name, but running an experiment records who ran it.</p>';
-      document.getElementById('name-form').addEventListener('submit', function (e) {
-        e.preventDefault();
-        var name = document.getElementById('display-name').value.trim();
-        if (!name) return;
-        fetch('/api/me', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ displayName: name }),
-        }).then(function (r) { return r.json(); }).then(function (data) {
-          me.displayName = data.displayName;
-          renderName();
-        });
-      });
-    }
-    updateRunButton();
-  }
+export interface DiscoverFeedItem {
+  post: Post;
+  coverImageId: string | null;
+  authorHandle: string;
+  authorDisplayName: string;
+  categoryName: string;
+  buyCount: number;
+  passCount: number;
+}
 
-  // --- playground fields ---
-  function renderPlaygroundFields() {
-    var container = document.getElementById('playground-fields');
-    container.innerHTML = caseDef.variables.map(function (v) {
-      var options = v.options.map(function (o) { return '<option value="' + o.value + '">' + o.label + '</option>'; }).join('');
-      return '<div><label for="field-' + v.key + '">' + v.label + '</label>' +
-        '<select id="field-' + v.key + '" name="' + v.key + '">' + options + '</select></div>';
-    }).join('');
-  }
+export function discoverPage(
+  viewer: ViewerContext,
+  items: DiscoverFeedItem[],
+  categories: Category[],
+  filters: { categoryId?: string; search?: string; sort?: "recent" | "discussed" },
+  nextCursor: string | null,
+): string {
+  const categoryPills = [`<a href="/discover" class="pill${!filters.categoryId ? " pill-active" : ""}">All</a>`]
+    .concat(
+      categories.map(
+        (c) =>
+          `<a href="/discover?category=${encodeURIComponent(c.id)}" class="pill${filters.categoryId === c.id ? " pill-active" : ""}">${escapeHtml(c.name)}</a>`,
+      ),
+    )
+    .join("");
 
-  function updateRunButton() {
-    var btn = document.getElementById('run-btn');
-    btn.disabled = !me.displayName;
-    btn.title = me.displayName ? '' : 'Set a display name above first';
-  }
+  const nextLink = nextCursor
+    ? `<a class="btn btn-ghost" href="/discover?${new URLSearchParams({
+        ...(filters.categoryId ? { category: filters.categoryId } : {}),
+        ...(filters.search ? { q: filters.search } : {}),
+        cursor: nextCursor,
+      }).toString()}">Load more →</a>`
+    : "";
 
-  document.getElementById('playground-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (!me.displayName) return;
-    var params = {};
-    caseDef.variables.forEach(function (v) {
-      params[v.key] = document.getElementById('field-' + v.key).value;
-    });
-    var note = document.getElementById('note').value.trim();
-    var btn = document.getElementById('run-btn');
-    btn.disabled = true;
-    fetch('/api/cases/' + caseId + '/experiments', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ params: params, note: note || null }),
-    }).then(function (r) {
-      if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'request failed'); });
-      return r.json();
-    }).then(function (data) {
-      renderResult(data.experiment);
-      applyState(data.state);
-      document.getElementById('note').value = '';
-    }).catch(function (err) {
-      renderResult(null, err.message);
-    }).finally(function () {
-      updateRunButton();
-    });
-  });
+  const sortParams = (sort: "recent" | "discussed") =>
+    new URLSearchParams({
+      ...(filters.categoryId ? { category: filters.categoryId } : {}),
+      ...(filters.search ? { q: filters.search } : {}),
+      sort,
+    }).toString();
+  const sortToggle = `<div class="sort-toggle" role="radiogroup" aria-label="Sort posts">
+    <a href="/discover?${sortParams("recent")}" class="sort-option${filters.sort !== "discussed" ? " active" : ""}">Recent</a>
+    <a href="/discover?${sortParams("discussed")}" class="sort-option${filters.sort === "discussed" ? " active" : ""}">Most discussed</a>
+  </div>`;
 
-  function renderResult(experiment, errorMessage) {
-    var box = document.getElementById('result-readout');
-    box.hidden = false;
-    if (errorMessage) {
-      box.innerHTML = '<span class="badge badge-fail">error</span> ' + escapeHtml(errorMessage);
-      return;
-    }
-    var badge = experiment.passed
-      ? '<span class="badge badge-pass">passed</span>'
-      : '<span class="badge badge-fail">failed</span>';
-    box.innerHTML = badge + ' expected: ' + experiment.expectedResult + ' &middot; actual: ' + experiment.actualResult;
-  }
+  const body = `
+<section class="discover-header">
+  <h1>Discover</h1>
+  <form method="get" action="/discover" class="search-form">
+    ${filters.categoryId ? `<input type="hidden" name="category" value="${escapeHtml(filters.categoryId)}" />` : ""}
+    <input type="search" name="q" placeholder="Search purchasing questions…" value="${escapeHtml(filters.search ?? "")}" aria-label="Search posts" />
+    <button type="submit" class="btn btn-brand">Search</button>
+  </form>
+</section>
+<nav class="category-pills" aria-label="Filter by category">${categoryPills}</nav>
+${sortToggle}
+${items.length > 0
+  ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div><div class="load-more-row">${nextLink}</div>`
+  : emptyState({
+      icon: "🔍",
+      title: "Nothing here yet",
+      body: filters.search || filters.categoryId ? "Try a different search or category." : "No public posts yet — be the first to ask the community.",
+      actionHref: viewer.user ? "/posts/new" : "/register",
+      actionLabel: "Create a post",
+    })}`;
+  return layout({ title: "Discover", viewer, activeNav: "discover", body, bodyClass: "page-discover" });
+}
 
-  document.getElementById('reset-btn').addEventListener('click', function () {
-    if (!confirm('Clear all evidence collected for this case? This affects everyone in the room.')) return;
-    fetch('/api/cases/' + caseId + '/reset', { method: 'POST' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) { applyState(data.state); });
-  });
+// --------------------------------------------------------- post detail ----
 
-  // --- evidence board ---
-  function renderEvidence(state) {
-    var container = document.getElementById('evidence-container');
-    if (state.experiments.length === 0) {
-      container.innerHTML = '<p class="evidence-empty">No experiments yet. Run one above to start the investigation.</p>';
-      return;
-    }
-    var comboCounts = {};
-    state.experiments.forEach(function (e) {
-      var key = JSON.stringify(e.params);
-      comboCounts[key] = (comboCounts[key] || 0) + 1;
-    });
-    var seen = {};
-    var rows = state.experiments.slice().reverse().map(function (e) {
-      var key = JSON.stringify(e.params);
-      seen[key] = (seen[key] || 0) + 1;
-      var isRepeat = comboCounts[key] > 1;
-      var repeatTag = isRepeat ? ' <span class="repeat-tag">(repeat ' + seen[key] + '/' + comboCounts[key] + ')</span>' : '';
-      var youTag = e.participantId === me.id ? ' <span class="badge badge-dim">you</span>' : '';
-      var badge = e.passed ? '<span class="badge badge-pass">pass</span>' : '<span class="badge badge-fail">fail</span>';
-      var isNew = e.id === lastExperimentId;
-      return '<tr class="' + (isNew ? 'enter pulse' : '') + '">' +
-        '<td class="mono">' + fmtTime(e.createdAt) + '</td>' +
-        '<td>' + escapeHtml(e.participantName) + youTag + '</td>' +
-        '<td class="mono">' + escapeHtml(fmtParams(e.params)) + repeatTag + '</td>' +
-        '<td>' + badge + '</td>' +
-        '<td>' + (e.note ? escapeHtml(e.note) : '<span style="color:var(--text-dim);">&mdash;</span>') + '</td>' +
-        '</tr>';
-    }).join('');
-    container.innerHTML =
-      '<div class="evidence-scroll"><table class="evidence"><thead><tr><th>Time</th><th>Participant</th><th>Conditions</th><th>Result</th><th>Note</th></tr></thead><tbody>' +
-      rows + '</tbody></table></div>' +
-      '<p style="color:var(--text-dim); font-size:0.82rem; margin-top:10px;">' + state.recommendation.testedCount + ' of ' + state.recommendation.totalCombos + ' combinations tested at least once.</p>';
-  }
+export interface PostDetailData {
+  post: Post;
+  images: { id: string }[];
+  author: { id: string; handle: string; displayName: string };
+  category: Category;
+  buyCount: number;
+  passCount: number;
+  opinions: OpinionWithAuthor[];
+  myOpinion: Opinion | null;
+  outcome: PostOutcome | null;
+  shareUrl: string;
+}
 
-  // --- hypotheses ---
-  function renderHypotheses(state) {
-    var container = document.getElementById('hyp-list');
-    var consistent = state.recommendation.consistentHypothesisIds;
-    container.innerHTML = caseDef.hypotheses.map(function (h) {
-      var isConsistent = consistent.indexOf(h.id) !== -1;
-      var badge = isConsistent
-        ? (consistent.length === 1 ? '<span class="badge badge-pass">only remaining</span>' : '<span class="badge badge-amber">possible</span>')
-        : '<span class="badge badge-dim">ruled out</span>';
-      return '<li class="' + (isConsistent ? '' : 'ruled-out') + '"><span>' + escapeHtml(h.label) + '</span>' + badge + '</li>';
-    }).join('');
+export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flash: { message: string | null; kind: "error" | "success" }): string {
+  const { post, images, author, category, buyCount, passCount, opinions, myOpinion, outcome } = data;
+  const price = formatPrice(post.priceCents, post.currency);
+  const isAuthor = viewer.user?.id === author.id;
+  const total = buyCount + passCount;
+  const buyPct = total > 0 ? Math.round((buyCount / total) * 100) : 50;
 
-    var revealContainer = document.getElementById('reveal-container');
-    var identified = state.recommendation.status === 'identified' && consistent.length === 1;
-    if (identified) {
-      revealContainer.innerHTML = '<button class="btn btn-primary" id="reveal-btn" type="button">Reveal known cause</button><div id="reveal-box"></div>';
-      document.getElementById('reveal-btn').addEventListener('click', function () {
-        fetch('/api/cases/' + caseId + '/reveal').then(function (r) { return r.json(); }).then(function (data) {
-          document.getElementById('reveal-box').innerHTML =
-            '<div class="reveal-box enter"><strong>Known cause:</strong> ' + escapeHtml(data.explanation) + '</div>';
-        });
-      });
-    } else {
-      revealContainer.innerHTML = '<p style="color:var(--text-dim); font-size:0.85rem;">The known cause becomes revealable once the evidence narrows to exactly one remaining explanation.</p>';
-    }
-  }
+  const gallery = images.length > 0
+    ? `<div class="post-gallery" data-gallery>
+        <div class="post-gallery-main"><img src="/images/${images[0].id}" alt="" id="gallery-main-img" /></div>
+        ${images.length > 1 ? `<div class="post-gallery-thumbs">${images.map((img, i) => `<button type="button" class="gallery-thumb${i === 0 ? " active" : ""}" data-image-id="${img.id}"><img src="/images/${img.id}" alt="" /></button>`).join("")}</div>` : ""}
+      </div>`
+    : `<div class="post-gallery-placeholder">🛍️</div>`;
 
-  // --- recommendation ---
-  function renderRecommendation(state) {
-    var container = document.getElementById('recommend-container');
-    var r = state.recommendation;
-    var cls = r.status === 'identified' ? 'identified' : '';
-    var comboHtml = r.next ? '<p class="combo" style="margin:8px 0 0;">Try: ' + escapeHtml(fmtParams(r.next.params)) + '</p>' : '';
-    container.innerHTML = '<div class="recommend-box ' + cls + '"><p style="margin:0;">' + escapeHtml(r.explanation) + '</p>' + comboHtml + '</div>';
-  }
+  const opinionForm = !viewer.user
+    ? `<div class="opinion-cta"><p>Log in to share your honest opinion.</p><a href="/login" class="btn btn-brand">Log in to vote</a></div>`
+    : isAuthor
+    ? `<div class="opinion-cta"><p>Post authors don't vote on their own posts — opinions should come from the community, not confirm your own thinking.</p></div>`
+    : post.status !== "active"
+    ? `<div class="opinion-cta"><p>This post is no longer available for opinions.</p></div>`
+    : `<form method="post" action="/posts/${post.id}/opinions" class="opinion-form" id="opinion-form">
+        <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+        <div class="stance-toggle" role="radiogroup" aria-label="Your stance">
+          <label class="stance-option stance-option-buy${myOpinion?.stance === "BUY" ? " selected" : ""}">
+            <input type="radio" name="stance" value="BUY" ${myOpinion?.stance === "BUY" ? "checked" : ""} required /> 👍 Buy
+          </label>
+          <label class="stance-option stance-option-pass${myOpinion?.stance === "PASS" ? " selected" : ""}">
+            <input type="radio" name="stance" value="PASS" ${myOpinion?.stance === "PASS" ? "checked" : ""} required /> 👎 Pass
+          </label>
+        </div>
+        <textarea name="comment" placeholder="One honest sentence about why…" maxlength="500" required>${escapeHtml(myOpinion?.comment ?? "")}</textarea>
+        <button type="submit" class="btn btn-brand btn-block">${myOpinion ? "Update my opinion" : "Submit opinion"}</button>
+      </form>`;
 
-  function renderPresence(count) {
-    document.getElementById('presence-count').textContent = count + (count === 1 ? ' investigator connected' : ' investigators connected');
-  }
+  const outcomeSection = isAuthor
+    ? `<div class="outcome-card">
+        <h3>What did you decide?</h3>
+        <form method="post" action="/posts/${post.id}/outcome" class="outcome-form">
+          <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+          <div class="outcome-options">
+            <label class="outcome-option${outcome?.status === "BOUGHT" ? " selected" : ""}"><input type="radio" name="status" value="BOUGHT" ${outcome?.status === "BOUGHT" ? "checked" : ""} /> ✅ Bought</label>
+            <label class="outcome-option${outcome?.status === "DID_NOT_BUY" ? " selected" : ""}"><input type="radio" name="status" value="DID_NOT_BUY" ${outcome?.status === "DID_NOT_BUY" ? "checked" : ""} /> 🚫 Didn't buy</label>
+            <label class="outcome-option${outcome?.status === "STILL_DECIDING" ? " selected" : ""}"><input type="radio" name="status" value="STILL_DECIDING" ${!outcome || outcome?.status === "STILL_DECIDING" ? "checked" : ""} /> 🤔 Still deciding</label>
+          </div>
+          <textarea name="reflection" placeholder="Optional reflection…" maxlength="1000">${escapeHtml(outcome?.reflection ?? "")}</textarea>
+          <button type="submit" class="btn btn-secondary">Save outcome</button>
+        </form>
+      </div>`
+    : outcome
+    ? `<div class="outcome-card outcome-readonly"><h3>Outcome</h3>${outcomeBadge(outcome.status)}${outcome.reflection ? `<p class="outcome-reflection">${escapeHtml(outcome.reflection)}</p>` : ""}</div>`
+    : "";
 
-  function applyState(state) {
-    if (state.experiments.length > 0) {
-      lastExperimentId = state.experiments[state.experiments.length - 1].id;
-    }
-    renderEvidence(state);
-    renderHypotheses(state);
-    renderRecommendation(state);
-    renderPresence(state.presence);
-  }
+  const opinionsList = opinions.length > 0
+    ? opinions
+        .map(
+          (o) => `<div class="opinion-item" data-opinion-user="${o.userId}">
+          <div class="opinion-item-head">
+            <a href="/u/${encodeURIComponent(o.authorHandle)}" class="opinion-author">@${escapeHtml(o.authorHandle)}</a>
+            ${stanceBadge(o.stance, "small")}
+            <span class="opinion-time muted">${timeAgo(o.updatedAt)}</span>
+          </div>
+          <p class="opinion-comment">${escapeHtml(o.comment)}</p>
+        </div>`,
+        )
+        .join("\n")
+    : `<p class="muted">No opinions yet — be the first to weigh in.</p>`;
 
-  renderName();
-  renderPlaygroundFields();
-  applyState(bootstrap.state);
+  const ownerControls = isAuthor
+    ? `<div class="post-owner-controls">
+        <a href="/posts/${post.id}/edit" class="btn btn-ghost btn-small">Edit post</a>
+      </div>`
+    : "";
 
-  var source = new EventSource('/api/cases/' + caseId + '/events');
-  source.addEventListener('state', function (e) { applyState(JSON.parse(e.data)); });
-  source.addEventListener('presence', function (e) { renderPresence(JSON.parse(e.data).count); });
-  source.onerror = function () {
-    // EventSource retries on its own; re-fetch authoritative state once the
-    // connection drops so a flaky network doesn't leave stale evidence
-    // showing until the retry succeeds.
-    fetch('/api/cases/' + caseId + '/state').then(function (r) { return r.json(); }).then(applyState).catch(function () {});
-  };
-})();
-`;
+  const reportControl = viewer.user && !isAuthor
+    ? `<details class="report-details">
+        <summary>Report this post</summary>
+        <form method="post" action="/posts/${post.id}/report" class="report-form">
+          <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+          <textarea name="reason" placeholder="What's wrong with this post?" maxlength="500" required></textarea>
+          <button type="submit" class="btn btn-ghost btn-small">Submit report</button>
+        </form>
+      </details>`
+    : "";
+
+  const body = `
+<article class="post-detail" data-post-id="${post.id}">
+  ${flashBanner(flash.message, flash.kind)}
+  <div class="post-detail-grid">
+    <div class="post-detail-media">${gallery}</div>
+    <div class="post-detail-info">
+      ${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted — share link only</span>` : ""}
+      <span class="post-detail-category">${escapeHtml(category.name)}</span>
+      <h1>${escapeHtml(post.title)}</h1>
+      <p class="post-detail-meta">by <a href="/u/${encodeURIComponent(author.handle)}">@${escapeHtml(author.handle)}</a> · ${timeAgo(post.createdAt)}</p>
+      ${price ? `<p class="post-detail-price">${escapeHtml(price)}</p>` : ""}
+      <p class="post-detail-description">${escapeHtml(post.description)}</p>
+      ${post.tags.length > 0 ? `<div class="tag-row">${post.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+      ${ownerControls}
+
+      <div class="opinion-summary" id="opinion-summary">
+        <div class="opinion-counts">
+          <span class="count-buy" id="count-buy">👍 ${buyCount} Buy</span>
+          <span class="count-pass" id="count-pass">👎 ${passCount} Pass</span>
+        </div>
+        <div class="stat-bar stat-bar-large"><span class="stat-bar-fill" id="buy-pct-bar" style="width:${buyPct}%"></span></div>
+      </div>
+
+      ${opinionForm}
+      ${outcomeSection}
+    </div>
+  </div>
+
+  <section class="opinions-section">
+    <h2>Opinions (<span id="opinion-count">${opinions.length}</span>)</h2>
+    <div id="opinions-list" class="opinions-list">${opinionsList}</div>
+  </section>
+
+  ${reportControl}
+</article>
+<div id="live-connection-label" data-connected="false" hidden></div>`;
+  return layout({ title: post.title, viewer, body, bodyClass: "page-post-detail" });
+}
+
+// -------------------------------------------------------- create/edit -----
+
+export function createEditPostPage(
+  viewer: ViewerContext,
+  categories: Category[],
+  error: string | null,
+  mode: { kind: "create" } | { kind: "edit"; post: Post; existingImageIds: string[] },
+): string {
+  const isEdit = mode.kind === "edit";
+  const post = isEdit ? mode.post : null;
+  const action = isEdit ? `/posts/${mode.post.id}/edit` : "/posts/new";
+
+  const body = `
+<section class="form-section">
+  <h1>${isEdit ? "Edit your post" : "What are you thinking about buying?"}</h1>
+  <p class="muted">Keep it quick — a title, a photo or two, and why you're considering it.</p>
+  ${flashBanner(error)}
+  <form method="post" action="${action}" enctype="multipart/form-data" class="form-stack post-form">
+    <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+
+    <label>Product title
+      <input type="text" name="title" required maxlength="120" value="${escapeHtml(post?.title ?? "")}" placeholder="e.g. Mac mini M4 Pro for local AI dev" />
+    </label>
+
+    <label>Photos (1–4)
+      <input type="file" name="images" accept="image/*" multiple capture="environment" />
+      <span class="hint">JPEG, PNG, WebP, or GIF. Each photo is re-encoded and stripped of location/metadata.</span>
+    </label>
+    ${isEdit && mode.existingImageIds.length > 0
+      ? `<div class="existing-images">${mode.existingImageIds.map((id) => `<img src="/images/${id}" alt="" class="existing-image-thumb" />`).join("")}<p class="hint">Uploading new photos replaces these.</p></div>`
+      : ""}
+
+    <div class="form-row">
+      <label>Price (optional)
+        <input type="number" name="price" min="0" step="0.01" value="${post?.priceCents !== null && post?.priceCents !== undefined ? (post.priceCents / 100).toFixed(2) : ""}" placeholder="0.00" />
+      </label>
+      <label>Currency
+        <input type="text" name="currency" maxlength="3" value="${escapeHtml(post?.currency ?? "AUD")}" placeholder="AUD" style="text-transform:uppercase" />
+      </label>
+    </div>
+
+    <label>Category
+      <select name="category" required>
+        <option value="" disabled ${!post ? "selected" : ""}>Choose a category…</option>
+        ${categoryOptions(categories, post?.categoryId)}
+      </select>
+    </label>
+
+    <label>Tags (optional, comma-separated)
+      <input type="text" name="tags" maxlength="200" value="${escapeHtml((post?.tags ?? []).join(", "))}" placeholder="developer-hardware, local-ai" />
+    </label>
+
+    <label>Why are you considering this?
+      <textarea name="description" required maxlength="2000" placeholder="What would you use it for? What's pulling you toward it?">${escapeHtml(post?.description ?? "")}</textarea>
+    </label>
+
+    <fieldset class="visibility-fieldset">
+      <legend>Visibility</legend>
+      <label class="radio-row"><input type="radio" name="visibility" value="public" ${!post || post.visibility === "public" ? "checked" : ""} /> Public — appears in Discover</label>
+      <label class="radio-row"><input type="radio" name="visibility" value="unlisted" ${post?.visibility === "unlisted" ? "checked" : ""} /> Unlisted — only people with the link can see it</label>
+    </fieldset>
+
+    <button type="submit" class="btn btn-brand btn-large btn-block">${isEdit ? "Save changes" : "Publish post"}</button>
+  </form>
+</section>`;
+  return layout({ title: isEdit ? "Edit post" : "New post", viewer, activeNav: "create", body, bodyClass: "page-post-form" });
+}
+
+// ----------------------------------------------------------- profile ------
+
+export interface ProfileData {
+  profileUser: User;
+  isOwnProfile: boolean;
+  interests: Category[];
+  allCategories: Category[];
+  authoredPosts: DiscoverFeedItem[];
+  opinionsGiven: { opinion: Opinion; post: Post }[];
+  purchaseOutcomes: { post: Post; outcome: PostOutcome }[];
+}
+
+export function profilePage(
+  viewer: ViewerContext,
+  data: ProfileData,
+  flash?: { message: string | null; kind: "error" | "success" },
+): string {
+  const { profileUser, isOwnProfile, interests, allCategories, authoredPosts, opinionsGiven, purchaseOutcomes } = data;
+
+  const interestsBlock = isOwnProfile
+    ? `<form method="post" action="/me/interests" class="interests-form">
+        <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+        <div class="interest-checks">
+          ${allCategories
+            .map(
+              (c) =>
+                `<label class="interest-check"><input type="checkbox" name="interests" value="${c.id}" ${interests.some((i) => i.id === c.id) ? "checked" : ""} /> ${escapeHtml(c.name)}</label>`,
+            )
+            .join("")}
+        </div>
+        <button type="submit" class="btn btn-secondary btn-small">Save interests</button>
+      </form>`
+    : interests.length > 0
+    ? `<div class="tag-row">${interests.map((i) => `<span class="tag">${escapeHtml(i.name)}</span>`).join("")}</div>`
+    : `<p class="muted">No public interests yet.</p>`;
+
+  const editProfileBlock = isOwnProfile
+    ? `<details class="profile-edit-details">
+        <summary>Edit profile</summary>
+        <form method="post" action="/me/profile" enctype="multipart/form-data" class="form-stack">
+          <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+          <label>Display name<input type="text" name="displayName" maxlength="60" value="${escapeHtml(profileUser.displayName)}" required /></label>
+          <label>Bio<textarea name="bio" maxlength="300" placeholder="A short public bio">${escapeHtml(profileUser.bio)}</textarea></label>
+          <label>Avatar photo (optional)<input type="file" name="avatar" accept="image/*" /></label>
+          <button type="submit" class="btn btn-secondary">Save profile</button>
+        </form>
+      </details>
+      <details class="profile-edit-details">
+        <summary>Account settings</summary>
+        <form method="post" action="/me/password" class="form-stack">
+          <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+          <label>Current password<input type="password" name="currentPassword" required autocomplete="current-password" /></label>
+          <label>New password<input type="password" name="newPassword" required minlength="8" maxlength="256" autocomplete="new-password" /></label>
+          <button type="submit" class="btn btn-secondary">Change password</button>
+        </form>
+      </details>`
+    : "";
+
+  const avatarLarge = profileUser.avatarImageId
+    ? `<img src="/images/${profileUser.avatarImageId}" alt="" class="profile-avatar-large profile-avatar-photo" />`
+    : `<div class="profile-avatar-large">${escapeHtml((profileUser.displayName.trim()[0] ?? "?").toUpperCase())}</div>`;
+
+  const body = `
+${flash ? flashBanner(flash.message, flash.kind) : ""}
+<section class="profile-header">
+  ${avatarLarge}
+  <div>
+    <h1>${escapeHtml(profileUser.displayName)}</h1>
+    <p class="muted">@${escapeHtml(profileUser.handle)}</p>
+    ${profileUser.bio ? `<p class="profile-bio">${escapeHtml(profileUser.bio)}</p>` : ""}
+  </div>
+</section>
+${editProfileBlock}
+
+<section class="section">
+  <h2>Interests</h2>
+  ${interestsBlock}
+</section>
+
+<section class="section">
+  <h2>Posts by @${escapeHtml(profileUser.handle)}</h2>
+  ${authoredPosts.length > 0
+    ? `<div class="post-grid">${authoredPosts.map((i) => postCard(i.post, i)).join("\n")}</div>`
+    : `<p class="muted">No public posts yet.</p>`}
+</section>
+
+${isOwnProfile
+  ? `<section class="section">
+      <h2>Opinions you've given</h2>
+      ${opinionsGiven.length > 0
+        ? `<div class="activity-list">${opinionsGiven
+            .map(
+              (o) => `<a href="/posts/${o.post.id}" class="activity-row">
+              ${stanceBadge(o.opinion.stance, "small")}
+              <span>${escapeHtml(o.post.title)}</span>
+              <span class="muted">${timeAgo(o.opinion.updatedAt)}</span>
+            </a>`,
+            )
+            .join("\n")}</div>`
+        : `<p class="muted">You haven't given any opinions yet.</p>`}
+    </section>
+
+    <section class="section">
+      <h2>Your purchase outcomes</h2>
+      ${purchaseOutcomes.length > 0
+        ? `<div class="activity-list">${purchaseOutcomes
+            .map(
+              (o) => `<a href="/posts/${o.post.id}" class="activity-row">
+              ${outcomeBadge(o.outcome.status)}
+              <span>${escapeHtml(o.post.title)}</span>
+              <span class="muted">${timeAgo(o.outcome.updatedAt)}</span>
+            </a>`,
+            )
+            .join("\n")}</div>`
+        : `<p class="muted">No purchase outcomes recorded yet — record one from any of your own posts.</p>`}
+    </section>`
+  : ""}`;
+  return layout({ title: profileUser.displayName, viewer, activeNav: isOwnProfile ? "profile" : undefined, body, bodyClass: "page-profile" });
+}
+
+// ------------------------------------------------------- my activity ------
+
+export interface ActivityFeedItem {
+  kind: "new_opinion" | "post_created" | "outcome_recorded";
+  postId: string;
+  postTitle: string;
+  detail: string;
+  ts: string;
+}
+
+export function myActivityPage(viewer: ViewerContext, items: ActivityFeedItem[]): string {
+  const body = `
+<section class="section">
+  <h1>My activity</h1>
+  <p class="muted">What's happened on your posts recently.</p>
+  ${items.length > 0
+    ? `<div class="activity-list">${items
+        .map(
+          (i) => `<a href="/posts/${i.postId}" class="activity-row">
+          <span class="activity-icon">${i.kind === "new_opinion" ? "💬" : i.kind === "post_created" ? "🛍️" : "📦"}</span>
+          <span><strong>${escapeHtml(i.postTitle)}</strong><br/><span class="muted">${escapeHtml(i.detail)}</span></span>
+          <span class="muted">${timeAgo(i.ts)}</span>
+        </a>`,
+        )
+        .join("\n")}</div>`
+    : emptyState({ icon: "📭", title: "No activity yet", body: "Once people react to your posts, you'll see it here." })}
+</section>`;
+  return layout({ title: "My activity", viewer, activeNav: "activity", body, bodyClass: "page-activity" });
+}
+
+// ------------------------------------------------------------- admin ------
+
+export function adminPage(viewer: ViewerContext): string {
+  const body = `
+<section class="section admin-section" id="admin-root" data-csrf="${escapeHtml(viewer.csrfToken ?? "")}">
+  <h1>Observability</h1>
+  <p class="muted">Live, structured server activity — for C10 "Fly by instruments." Identifiers only; no passwords, tokens, emails, or free-text content are ever shown here.</p>
+
+  <div class="admin-stats" id="admin-stats">
+    <div class="admin-stat"><span class="admin-stat-value" id="stat-active-users">–</span><span class="admin-stat-label">Active users (1h)</span></div>
+    <div class="admin-stat"><span class="admin-stat-value" id="stat-total-events">–</span><span class="admin-stat-label">Events (1h)</span></div>
+    <div class="admin-stat"><span class="admin-stat-value" id="stat-failed-events">–</span><span class="admin-stat-label">Failures (1h)</span></div>
+    <div class="admin-stat"><span class="admin-stat-value" id="stat-connection">●</span><span class="admin-stat-label" id="stat-connection-label">connecting…</span></div>
+  </div>
+
+  <h2>Live event log</h2>
+  <div class="admin-log" id="admin-log" aria-live="polite"></div>
+
+  <h2>Open reports</h2>
+  <div id="admin-reports" class="admin-reports"></div>
+</section>`;
+  return layout({ title: "Observability", viewer, activeNav: "admin", body, bodyClass: "page-admin" });
+}
+
+export function notFoundPage(viewer: ViewerContext): string {
+  const body = emptyState({ icon: "🤷", title: "Nothing here", body: "This post may be private, deleted, or never existed.", actionHref: "/discover", actionLabel: "Back to Discover" });
+  return layout({ title: "Not found", viewer, body, bodyClass: "page-notfound" });
+}
+
+export function errorPage(viewer: ViewerContext, status: number, message: string): string {
+  const body = emptyState({ icon: status >= 500 ? "⚠️" : "🚫", title: `Error ${status}`, body: message, actionHref: "/", actionLabel: "Back home" });
+  return layout({ title: `Error ${status}`, viewer, body, bodyClass: "page-error" });
+}
