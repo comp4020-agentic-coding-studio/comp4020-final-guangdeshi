@@ -39,6 +39,7 @@ export interface User {
   bio: string;
   avatarImageId: string | null;
   isAdmin: boolean;
+  isDemo: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +54,7 @@ function rowToUser(row: any): User {
     bio: row.bio,
     avatarImageId: row.avatar_image_id,
     isAdmin: !!row.is_admin,
+    isDemo: !!row.is_demo,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -62,8 +64,22 @@ export function createUser(email: string, handle: string, passwordHash: string, 
   const id = randomUUID();
   const ts = now();
   db.prepare(
-    `INSERT INTO users (id, email, handle, password_hash, display_name, bio, avatar_image_id, is_admin, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, '', NULL, 0, ?, ?)`,
+    `INSERT INTO users (id, email, handle, password_hash, display_name, bio, avatar_image_id, is_admin, is_demo, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, '', NULL, 0, 0, ?, ?)`,
+  ).run(id, email, handle, passwordHash, displayName, ts, ts);
+  return getUserById(id)!;
+}
+
+// Demo seeding only (scripts/seed-demo-content.ts) — same insert as
+// createUser plus is_demo=1, so every other read path treats a demo account
+// exactly like a real one except where a query explicitly filters on
+// is_demo (activityStats, the real-participation admin counts).
+export function createDemoUser(email: string, handle: string, passwordHash: string, displayName: string): User {
+  const id = randomUUID();
+  const ts = now();
+  db.prepare(
+    `INSERT INTO users (id, email, handle, password_hash, display_name, bio, avatar_image_id, is_admin, is_demo, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, '', NULL, 0, 1, ?, ?)`,
   ).run(id, email, handle, passwordHash, displayName, ts, ts);
   return getUserById(id)!;
 }
@@ -252,6 +268,8 @@ export function getImageById(id: string): ImageRow | undefined {
 
 // --------------------------------------------------------------- posts ----
 
+export type PostMode = "BUY_PASS" | "WHICH_ONE";
+
 export interface Post {
   id: string;
   authorId: string;
@@ -263,11 +281,13 @@ export interface Post {
   tags: string[];
   visibility: "public" | "unlisted";
   status: "active" | "deleted";
+  mode: PostMode;
+  isDemo: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-function rowToPost(row: any): Post {
+export function rowToPost(row: any): Post {
   return {
     id: row.id,
     authorId: row.author_id,
@@ -279,6 +299,8 @@ function rowToPost(row: any): Post {
     tags: JSON.parse(row.tags),
     visibility: row.visibility,
     status: row.status,
+    mode: row.post_mode,
+    isDemo: !!row.is_demo,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -293,6 +315,8 @@ export interface NewPost {
   categoryId: string;
   tags: string[];
   visibility: "public" | "unlisted";
+  mode?: PostMode; // defaults to BUY_PASS — the only mode that existed pre-v2
+  isDemo?: boolean; // defaults to false; only scripts/seed-demo-content.ts ever passes true
 }
 
 export function createPost(input: NewPost, imageIds: string[]): Post {
@@ -301,8 +325,8 @@ export function createPost(input: NewPost, imageIds: string[]): Post {
   db.exec("BEGIN");
   try {
     db.prepare(
-      `INSERT INTO posts (id, author_id, title, description, price_cents, currency, category_id, tags, visibility, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      `INSERT INTO posts (id, author_id, title, description, price_cents, currency, category_id, tags, visibility, status, post_mode, is_demo, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
     ).run(
       id,
       input.authorId,
@@ -313,6 +337,8 @@ export function createPost(input: NewPost, imageIds: string[]): Post {
       input.categoryId,
       JSON.stringify(input.tags),
       input.visibility,
+      input.mode ?? "BUY_PASS",
+      input.isDemo ? 1 : 0,
       ts,
       ts,
     );
@@ -397,7 +423,10 @@ export interface FeedPage {
 
 export function listFeed(query: FeedQuery): FeedPage {
   const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-  const clauses = ["status = 'active'", "visibility = 'public'"];
+  // Demo content lives in its own /discover/demo feed (getDemoFeed below),
+  // never mixed into the real Discover feed — a visitor should never
+  // mistake a fictional scenario for genuine community activity.
+  const clauses = ["status = 'active'", "visibility = 'public'", "is_demo = 0"];
   const params: any[] = [];
 
   if (query.categoryId) {
@@ -437,13 +466,29 @@ export function listMostDiscussed(limit = 20): (Post & { opinionCount: number })
     .prepare(
       `SELECT p.*, COUNT(o.id) AS opinion_count
        FROM posts p LEFT JOIN opinions o ON o.post_id = p.id
-       WHERE p.status = 'active' AND p.visibility = 'public'
+       WHERE p.status = 'active' AND p.visibility = 'public' AND p.is_demo = 0
        GROUP BY p.id
        ORDER BY opinion_count DESC, p.created_at DESC
        LIMIT ?`,
     )
     .all(limit) as any[];
   return rows.map((row) => ({ ...rowToPost(row), opinionCount: row.opinion_count }));
+}
+
+/**
+ * Feature D's dedicated demo feed (brief: "a clearly labelled 'Explore
+ * Demo' section," never mixed into real Discover). Readable by anyone,
+ * logged in or not. Bounded, single page — a showcase of 18-24 scenarios
+ * never needs real pagination.
+ */
+export function getDemoFeed(limit = 30): Post[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM posts WHERE status = 'active' AND visibility = 'public' AND is_demo = 1
+       ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(limit) as any[];
+  return rows.map(rowToPost);
 }
 
 export function listPostsByAuthor(authorId: string, includeUnlisted: boolean): Post[] {
@@ -456,15 +501,263 @@ export function listPostsByAuthor(authorId: string, includeUnlisted: boolean): P
   return rows.map(rowToPost);
 }
 
+// ------------------------------------------------------- post search -----
+// Feature C: SQLite FTS5 over title/description/context, explicitly synced
+// from application code on every post create/edit (never a SQL trigger) so
+// a missed sync is a visible bug in a reviewable function, not implicit
+// database magic. This is keyword relevance via bm25() ranking — not a
+// learned/semantic model; see docs/research/RECOMMENDATION_ROADMAP.md.
+
+export function indexPostForSearch(postId: string, title: string, description: string, contextText: string): void {
+  db.prepare(`DELETE FROM posts_search WHERE post_id = ?`).run(postId);
+  db.prepare(`INSERT INTO posts_search (post_id, title, description, context_text) VALUES (?, ?, ?, ?)`).run(
+    postId,
+    title,
+    description,
+    contextText,
+  );
+}
+
+export function removePostFromSearchIndex(postId: string): void {
+  db.prepare(`DELETE FROM posts_search WHERE post_id = ?`).run(postId);
+}
+
+export interface SearchResult {
+  post: Post;
+  rank: number;
+}
+
+/**
+ * FTS5 MATCH requires its query string to be free of characters FTS5's
+ * query syntax treats specially (", *, (, ), AND/OR/NOT as bare tokens)
+ * when the caller's input is just a post title or free text, not a
+ * deliberately-constructed FTS query — so this quotes each word as an FTS5
+ * string literal and ORs them together, which degrades gracefully to "match
+ * any word" rather than throwing a syntax error on punctuation a real post
+ * title might contain (e.g. "M4 Pro (2024)").
+ */
+function toFtsQuery(raw: string): string | null {
+  const words = raw
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter((w) => w.length > 0)
+    .slice(0, 12);
+  if (words.length === 0) return null;
+  return words.map((w) => `"${w}"`).join(" OR ");
+}
+
+export function searchPosts(
+  query: string,
+  opts: { categoryId?: string; excludePostId?: string; limit?: number; includeDemoOnly?: boolean } = {},
+): SearchResult[] {
+  const ftsQuery = toFtsQuery(query);
+  if (!ftsQuery) return [];
+  const limit = Math.min(Math.max(opts.limit ?? 10, 1), 30);
+
+  const clauses = ["p.status = 'active'", "p.visibility = 'public'"];
+  const params: any[] = [ftsQuery];
+  if (opts.includeDemoOnly) {
+    clauses.push("p.is_demo = 1");
+  } else {
+    clauses.push("p.is_demo = 0");
+  }
+  if (opts.categoryId) {
+    clauses.push("p.category_id = ?");
+    params.push(opts.categoryId);
+  }
+  if (opts.excludePostId) {
+    clauses.push("p.id != ?");
+    params.push(opts.excludePostId);
+  }
+  params.push(limit);
+
+  const rows = db
+    .prepare(
+      `SELECT p.*, bm25(posts_search) AS rank
+       FROM posts_search
+       JOIN posts p ON p.id = posts_search.post_id
+       WHERE posts_search MATCH ? AND ${clauses.join(" AND ")}
+       ORDER BY rank LIMIT ?`,
+    )
+    .all(...params) as any[];
+  return rows.map((row) => ({ post: rowToPost(row), rank: row.rank }));
+}
+
+// ----------------------------------------------------- purchase options ---
+// The 2-4 candidate products on a WHICH_ONE post (brief §7/§8). Always
+// created once, atomically, alongside the post — a post's option list is
+// never edited incrementally (add one, remove one); editing a WHICH_ONE
+// post replaces the whole option set in one transaction, the same pattern
+// createPost/updatePost already use for post_images.
+
+export interface PurchaseOption {
+  id: string;
+  postId: string;
+  position: number;
+  name: string;
+  imageId: string | null;
+  expectedPriceCents: number;
+  currency: string;
+  originalPriceCents: number | null;
+  condition: string | null;
+  sourceUrl: string | null;
+  saleNote: string | null;
+  specifications: Record<string, string> | null;
+  createdAt: string;
+}
+
+function rowToPurchaseOption(row: any): PurchaseOption {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    position: row.position,
+    name: row.name,
+    imageId: row.image_id,
+    expectedPriceCents: row.expected_price_cents,
+    currency: row.currency,
+    originalPriceCents: row.original_price_cents,
+    condition: row.condition,
+    sourceUrl: row.source_url,
+    saleNote: row.sale_note,
+    specifications: row.specifications ? JSON.parse(row.specifications) : null,
+    createdAt: row.created_at,
+  };
+}
+
+export interface NewPurchaseOption {
+  name: string;
+  imageId: string | null;
+  expectedPriceCents: number;
+  currency: string;
+  originalPriceCents?: number | null;
+  condition?: string | null;
+  sourceUrl?: string | null;
+  saleNote?: string | null;
+  specifications?: Record<string, string> | null;
+}
+
+/**
+ * Replaces a post's full option list atomically (brief: options are created
+ * once at post-creation and whole-replaced on edit, never patched one at a
+ * time). The 2-4 count bound is enforced by the caller (src/server.ts),
+ * which can produce a user-facing validation error; the DB layer only
+ * enforces position in [0,3] via CHECK, since that's a structural guarantee
+ * regardless of caller.
+ */
+export function setPurchaseOptions(postId: string, options: NewPurchaseOption[]): PurchaseOption[] {
+  db.exec("BEGIN");
+  try {
+    db.prepare(`DELETE FROM purchase_options WHERE post_id = ?`).run(postId);
+    const ts = now();
+    const insert = db.prepare(
+      `INSERT INTO purchase_options (id, post_id, position, name, image_id, expected_price_cents, currency, original_price_cents, condition, source_url, sale_note, specifications, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    options.forEach((opt, index) => {
+      insert.run(
+        randomUUID(),
+        postId,
+        index,
+        opt.name,
+        opt.imageId,
+        opt.expectedPriceCents,
+        opt.currency,
+        opt.originalPriceCents ?? null,
+        opt.condition ?? null,
+        opt.sourceUrl ?? null,
+        opt.saleNote ?? null,
+        opt.specifications ? JSON.stringify(opt.specifications) : null,
+        ts,
+      );
+    });
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  return getPurchaseOptionsForPost(postId);
+}
+
+export function getPurchaseOptionsForPost(postId: string): PurchaseOption[] {
+  return (
+    db.prepare(`SELECT * FROM purchase_options WHERE post_id = ? ORDER BY position ASC`).all(postId) as any[]
+  ).map(rowToPurchaseOption);
+}
+
+export function getPurchaseOptionById(id: string): PurchaseOption | undefined {
+  const row = db.prepare(`SELECT * FROM purchase_options WHERE id = ?`).get(id);
+  return row ? rowToPurchaseOption(row) : undefined;
+}
+
+// ---------------------------------------------------------- post context --
+// Feature A: up to 3 optional, category-specific answers plus one free-text
+// field (src/context-prompts.ts holds the actual prompt config). A post with
+// no context answered has no row here at all — "don't render blank cards"
+// is true by construction, not a template-side filter over empty strings.
+
+export interface PostContext {
+  postId: string;
+  schemaVersion: number;
+  categoryKey: string;
+  answers: Record<string, string>;
+  freeText: string;
+  updatedAt: string;
+}
+
+function rowToPostContext(row: any): PostContext {
+  return {
+    postId: row.post_id,
+    schemaVersion: row.schema_version,
+    categoryKey: row.category_key,
+    answers: JSON.parse(row.answers),
+    freeText: row.free_text,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function setPostContext(
+  postId: string,
+  schemaVersion: number,
+  categoryKey: string,
+  answers: Record<string, string>,
+  freeText: string,
+): PostContext {
+  const ts = now();
+  db.prepare(
+    `INSERT INTO post_context (post_id, schema_version, category_key, answers, free_text, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(post_id) DO UPDATE SET schema_version = excluded.schema_version, category_key = excluded.category_key, answers = excluded.answers, free_text = excluded.free_text, updated_at = excluded.updated_at`,
+  ).run(postId, schemaVersion, categoryKey, JSON.stringify(answers), freeText, ts);
+  return getPostContext(postId)!;
+}
+
+export function getPostContext(postId: string): PostContext | undefined {
+  const row = db.prepare(`SELECT * FROM post_context WHERE post_id = ?`).get(postId);
+  return row ? rowToPostContext(row) : undefined;
+}
+
+export function deletePostContext(postId: string): void {
+  db.prepare(`DELETE FROM post_context WHERE post_id = ?`).run(postId);
+}
+
 // ------------------------------------------------------------ opinions ----
 
 export type Stance = "BUY" | "PASS";
 
+// An opinion is exactly one of three shapes (enforced by the opinions CHECK
+// constraint in migration 0004): a BUY_PASS stance, a selected comparison
+// option, or an explicit "none of these" — never a mix, never all-null.
+// stance/selectedOptionId/selectedNone are all present on every Opinion
+// object so existing code reading `.stance` on a BUY_PASS opinion keeps
+// working unchanged; the two new fields are simply null/false for every
+// pre-v2 opinion row.
 export interface Opinion {
   id: string;
   postId: string;
   userId: string;
-  stance: Stance;
+  stance: Stance | null;
+  selectedOptionId: string | null;
+  selectedNone: boolean;
   comment: string;
   createdAt: string;
   updatedAt: string;
@@ -476,6 +769,8 @@ function rowToOpinion(row: any): Opinion {
     postId: row.post_id,
     userId: row.user_id,
     stance: row.stance,
+    selectedOptionId: row.selected_option_id,
+    selectedNone: !!row.selected_none,
     comment: row.comment,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -483,22 +778,50 @@ function rowToOpinion(row: any): Opinion {
 }
 
 /**
- * Create-or-update a user's opinion on a post in one atomic statement. This
- * is the mechanism that satisfies "one current opinion per (post_id,
- * user_id)" and "don't double-count concurrent submissions": the uniqueness
- * is a real database constraint (not just an application check), and the
- * whole read-modify-write is a single prepared-statement execution, so two
- * racing requests for the same (post, user) can't both "win" and create two
- * rows — the second one simply updates the first.
+ * Create-or-update a user's BUY_PASS opinion on a post in one atomic
+ * statement. This is the mechanism that satisfies "one current opinion per
+ * (post_id, user_id)" and "don't double-count concurrent submissions": the
+ * uniqueness is a real database constraint (not just an application check),
+ * and the whole read-modify-write is a single prepared-statement execution,
+ * so two racing requests for the same (post, user) can't both "win" and
+ * create two rows — the second one simply updates the first. Unchanged
+ * since before v2 — every existing BUY_PASS call site and test keeps
+ * working verbatim. selected_option_id/selected_none are explicitly reset
+ * to their "unused" values on every call, so flipping a post from
+ * comparison back to BUY_PASS (not a supported UI flow, but defensively)
+ * could never leave a stale selection behind.
  */
 export function upsertOpinion(postId: string, userId: string, stance: Stance, comment: string): Opinion {
   const id = randomUUID();
   const ts = now();
   db.prepare(
-    `INSERT INTO opinions (id, post_id, user_id, stance, comment, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(post_id, user_id) DO UPDATE SET stance = excluded.stance, comment = excluded.comment, updated_at = excluded.updated_at`,
+    `INSERT INTO opinions (id, post_id, user_id, stance, selected_option_id, selected_none, comment, created_at, updated_at)
+     VALUES (?, ?, ?, ?, NULL, 0, ?, ?, ?)
+     ON CONFLICT(post_id, user_id) DO UPDATE SET stance = excluded.stance, selected_option_id = NULL, selected_none = 0, comment = excluded.comment, updated_at = excluded.updated_at`,
   ).run(id, postId, userId, stance, comment, ts, ts);
+  return getOpinionByPostAndUser(postId, userId)!;
+}
+
+export type ComparisonSelection = { optionId: string } | { none: true };
+
+/**
+ * The WHICH_ONE-mode equivalent of upsertOpinion — same atomicity and
+ * concurrency guarantee (a single INSERT...ON CONFLICT), same UNIQUE
+ * (post_id, user_id) constraint. Validating that optionId actually belongs
+ * to this post is the caller's job (src/server.ts), since that needs a
+ * user-facing error message; the CHECK constraint is the structural
+ * backstop that a row can never end up with both a stance and a selection.
+ */
+export function upsertComparisonOpinion(postId: string, userId: string, selection: ComparisonSelection, comment: string): Opinion {
+  const id = randomUUID();
+  const ts = now();
+  const optionId = "optionId" in selection ? selection.optionId : null;
+  const isNone = "none" in selection && selection.none ? 1 : 0;
+  db.prepare(
+    `INSERT INTO opinions (id, post_id, user_id, stance, selected_option_id, selected_none, comment, created_at, updated_at)
+     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)
+     ON CONFLICT(post_id, user_id) DO UPDATE SET stance = NULL, selected_option_id = excluded.selected_option_id, selected_none = excluded.selected_none, comment = excluded.comment, updated_at = excluded.updated_at`,
+  ).run(id, postId, userId, optionId, isNone, comment, ts, ts);
   return getOpinionByPostAndUser(postId, userId)!;
 }
 
@@ -534,9 +857,17 @@ export function listOpinionsForPost(postId: string): OpinionWithAuthor[] {
   }));
 }
 
+/**
+ * Buy/Pass tallies only. The explicit `stance IS NOT NULL` guard means a
+ * WHICH_ONE post's comparison selections (which always have stance=NULL)
+ * can never be miscounted as Buy/Pass votes even if this were ever called
+ * on the wrong post — the brief's explicit "comparison votes cannot be
+ * counted as Buy/Pass votes" invariant, enforced at the query, not just by
+ * callers routing correctly.
+ */
 export function getOpinionCounts(postId: string): { buy: number; pass: number } {
   const rows = db
-    .prepare(`SELECT stance, COUNT(*) AS n FROM opinions WHERE post_id = ? GROUP BY stance`)
+    .prepare(`SELECT stance, COUNT(*) AS n FROM opinions WHERE post_id = ? AND stance IS NOT NULL GROUP BY stance`)
     .all(postId) as any[];
   const counts = { buy: 0, pass: 0 };
   for (const r of rows) {
@@ -544,6 +875,28 @@ export function getOpinionCounts(postId: string): { buy: number; pass: number } 
     else counts.pass = r.n;
   }
   return counts;
+}
+
+/**
+ * Per-option tallies for a WHICH_ONE post, plus a separate "none of these"
+ * count. Every purchase_option is represented even with zero votes (LEFT
+ * JOIN from purchase_options, not opinions), so a brand-new comparison post
+ * shows all its options at 0 rather than omitting unvoted ones.
+ */
+export function getOptionCounts(postId: string): { counts: Record<string, number>; noneCount: number } {
+  const optionRows = db
+    .prepare(
+      `SELECT po.id, COUNT(o.id) AS n
+       FROM purchase_options po LEFT JOIN opinions o ON o.selected_option_id = po.id
+       WHERE po.post_id = ? GROUP BY po.id`,
+    )
+    .all(postId) as any[];
+  const counts: Record<string, number> = {};
+  for (const r of optionRows) counts[r.id] = r.n;
+  const noneCount = (
+    db.prepare(`SELECT COUNT(*) AS n FROM opinions WHERE post_id = ? AND selected_none = 1`).get(postId) as any
+  ).n;
+  return { counts, noneCount };
 }
 
 export function deleteOpinion(postId: string, userId: string): boolean {
@@ -567,6 +920,8 @@ export interface PostOutcome {
   reflection: string;
   decidedAt: string;
   updatedAt: string;
+  purchasedOptionId: string | null;
+  influentialOpinionId: string | null;
 }
 
 function rowToOutcome(row: any): PostOutcome {
@@ -576,22 +931,64 @@ function rowToOutcome(row: any): PostOutcome {
     reflection: row.reflection,
     decidedAt: row.decided_at,
     updatedAt: row.updated_at,
+    purchasedOptionId: row.purchased_option_id,
+    influentialOpinionId: row.influential_opinion_id,
   };
 }
 
-export function upsertOutcome(postId: string, status: OutcomeStatus, reflection: string): PostOutcome {
+/**
+ * purchasedOptionId is preserved across repeat calls unless explicitly
+ * passed (undefined means "don't touch it"), the same optional-update
+ * convention used elsewhere in this file (see updatePost). influential_
+ * opinion_id is intentionally NOT touched here — it has its own dedicated
+ * setInfluentialOpinion function below, since marking/unmarking an
+ * influential opinion is a separate user action from recording BOUGHT/
+ * DID_NOT_BUY/STILL_DECIDING, and conflating them would mean re-saving the
+ * outcome form could accidentally clear an unrelated marker.
+ */
+export function upsertOutcome(
+  postId: string,
+  status: OutcomeStatus,
+  reflection: string,
+  purchasedOptionId?: string | null,
+): PostOutcome {
   const ts = now();
+  const current = getOutcome(postId);
+  const resolvedOptionId = purchasedOptionId !== undefined ? purchasedOptionId : (current?.purchasedOptionId ?? null);
   db.prepare(
-    `INSERT INTO post_outcomes (post_id, status, reflection, decided_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(post_id) DO UPDATE SET status = excluded.status, reflection = excluded.reflection, updated_at = excluded.updated_at`,
-  ).run(postId, status, reflection, ts, ts);
+    `INSERT INTO post_outcomes (post_id, status, reflection, decided_at, updated_at, purchased_option_id, influential_opinion_id)
+     VALUES (?, ?, ?, ?, ?, ?, NULL)
+     ON CONFLICT(post_id) DO UPDATE SET status = excluded.status, reflection = excluded.reflection, updated_at = excluded.updated_at, purchased_option_id = excluded.purchased_option_id`,
+  ).run(postId, status, reflection, ts, ts, resolvedOptionId);
   return getOutcome(postId)!;
 }
 
 export function getOutcome(postId: string): PostOutcome | undefined {
   const row = db.prepare(`SELECT * FROM post_outcomes WHERE post_id = ?`).get(postId);
   return row ? rowToOutcome(row) : undefined;
+}
+
+/**
+ * Feature E: the buyer's optional pointer at the single opinion they found
+ * influential. A separate function (not folded into upsertOutcome) because
+ * this can be set before any outcome row exists at all — the brief
+ * explicitly says the buyer shouldn't be forced to record an outcome before
+ * marking an influential comment. Creates a minimal STILL_DECIDING outcome
+ * row on first use so the FK has something to attach to, exactly mirroring
+ * how a fresh post with no outcome yet defaults to "still deciding" in the UI.
+ */
+export function setInfluentialOpinion(postId: string, opinionId: string | null): PostOutcome {
+  const current = getOutcome(postId);
+  const ts = now();
+  if (!current) {
+    db.prepare(
+      `INSERT INTO post_outcomes (post_id, status, reflection, decided_at, updated_at, purchased_option_id, influential_opinion_id)
+       VALUES (?, 'STILL_DECIDING', '', ?, ?, NULL, ?)`,
+    ).run(postId, ts, ts, opinionId);
+  } else {
+    db.prepare(`UPDATE post_outcomes SET influential_opinion_id = ?, updated_at = ? WHERE post_id = ?`).run(opinionId, ts, postId);
+  }
+  return getOutcome(postId)!;
 }
 
 // ------------------------------------------------------------- reports ----

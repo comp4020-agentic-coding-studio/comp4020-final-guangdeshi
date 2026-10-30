@@ -2,16 +2,21 @@
 // that render.ts's layout() wraps with nav/footer/head. Kept as plain
 // template strings (no templating engine) to match the zero-framework stack;
 // every user-authored string passed through escapeHtml() before interpolation.
-import type { Category, Opinion, OpinionWithAuthor, Post, PostOutcome, User } from "./db.ts";
+import type { Category, Opinion, OpinionWithAuthor, Post, PostContext, PostMode, PostOutcome, PurchaseOption, User } from "./db.ts";
+import { getContextPrompts, type ContextPrompt } from "./context-prompts.ts";
 import { escapeHtml } from "./validation.ts";
 import {
   categoryOptions,
+  contextCard,
   emptyState,
   flashBanner,
   formatPrice,
   layout,
+  opinionBadge,
   outcomeBadge,
   postCard,
+  purchaseOptionCard,
+  relatedDecisionCard,
   stanceBadge,
   timeAgo,
   type ViewerContext,
@@ -194,10 +199,26 @@ export interface PostDetailData {
   myOpinion: Opinion | null;
   outcome: PostOutcome | null;
   shareUrl: string;
+  // v2 additions — all optional so a caller passing only the legacy fields
+  // (any pre-v2 call site, and every pre-v2 test) still compiles and renders
+  // the original BUY_PASS experience unchanged.
+  options?: PurchaseOption[];
+  optionCounts?: { counts: Record<string, number>; noneCount: number };
+  context?: PostContext | null;
+  contextPrompts?: ContextPrompt[];
+  relatedPosts?: Post[];
+  influentialOpinionId?: string | null;
+}
+
+function optionNameFor(options: PurchaseOption[] | undefined, optionId: string | null): string | null {
+  if (!optionId) return null;
+  return options?.find((o) => o.id === optionId)?.name ?? null;
 }
 
 export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flash: { message: string | null; kind: "error" | "success" }): string {
   const { post, images, author, category, buyCount, passCount, opinions, myOpinion, outcome } = data;
+  const options = data.options ?? [];
+  const isComparison = post.mode === "WHICH_ONE";
   const price = formatPrice(post.priceCents, post.currency);
   const isAuthor = viewer.user?.id === author.id;
   const total = buyCount + passCount;
@@ -210,13 +231,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       </div>`
     : `<div class="post-gallery-placeholder">🛍️</div>`;
 
-  const opinionForm = !viewer.user
-    ? `<div class="opinion-cta"><p>Log in to share your honest opinion.</p><a href="/login" class="btn btn-brand">Log in to vote</a></div>`
-    : isAuthor
-    ? `<div class="opinion-cta"><p>Post authors don't vote on their own posts — opinions should come from the community, not confirm your own thinking.</p></div>`
-    : post.status !== "active"
-    ? `<div class="opinion-cta"><p>This post is no longer available for opinions.</p></div>`
-    : `<form method="post" action="/posts/${post.id}/opinions" class="opinion-form" id="opinion-form">
+  const buyPassForm = `<form method="post" action="/posts/${post.id}/opinions" class="opinion-form" id="opinion-form">
         <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
         <div class="stance-toggle" role="radiogroup" aria-label="Your stance">
           <label class="stance-option stance-option-buy${myOpinion?.stance === "BUY" ? " selected" : ""}">
@@ -230,6 +245,43 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         <button type="submit" class="btn btn-brand btn-block">${myOpinion ? "Update my opinion" : "Submit opinion"}</button>
       </form>`;
 
+  const comparisonForm = `<form method="post" action="/posts/${post.id}/opinions" class="opinion-form comparison-opinion-form" id="opinion-form">
+        <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+        <div class="option-select-row" role="radiogroup" aria-label="Pick one">
+          ${options
+            .map(
+              (opt) => `<label class="option-select${myOpinion?.selectedOptionId === opt.id ? " selected" : ""}">
+                <input type="radio" name="selectedOptionId" value="${opt.id}" ${myOpinion?.selectedOptionId === opt.id ? "checked" : ""} required /> ${escapeHtml(opt.name)}
+              </label>`,
+            )
+            .join("")}
+          <label class="option-select option-select-none${myOpinion?.selectedNone ? " selected" : ""}">
+            <input type="radio" name="selectedOptionId" value="none" ${myOpinion?.selectedNone ? "checked" : ""} required /> ✋ None of these
+          </label>
+        </div>
+        <textarea name="comment" placeholder="One honest sentence about why…" maxlength="500" required>${escapeHtml(myOpinion?.comment ?? "")}</textarea>
+        <button type="submit" class="btn btn-brand btn-block">${myOpinion ? "Update my opinion" : "Submit opinion"}</button>
+      </form>`;
+
+  const opinionForm = !viewer.user
+    ? `<div class="opinion-cta"><p>Log in to share your honest opinion.</p><a href="/login" class="btn btn-brand">Log in to vote</a></div>`
+    : isAuthor
+    ? `<div class="opinion-cta"><p>Post authors don't vote on their own posts — opinions should come from the community, not confirm your own thinking.</p></div>`
+    : post.status !== "active"
+    ? `<div class="opinion-cta"><p>This post is no longer available for opinions.</p></div>`
+    : isComparison
+    ? comparisonForm
+    : buyPassForm;
+
+  const outcomeOptionRow = isComparison && options.length > 0
+    ? `<label class="outcome-option-select">Which one did you buy, if any?
+        <select name="purchasedOptionId">
+          <option value="">— not specified —</option>
+          ${options.map((opt) => `<option value="${opt.id}" ${outcome?.purchasedOptionId === opt.id ? "selected" : ""}>${escapeHtml(opt.name)}</option>`).join("")}
+        </select>
+      </label>`
+    : "";
+
   const outcomeSection = isAuthor
     ? `<div class="outcome-card">
         <h3>What did you decide?</h3>
@@ -238,28 +290,42 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
           <div class="outcome-options">
             <label class="outcome-option${outcome?.status === "BOUGHT" ? " selected" : ""}"><input type="radio" name="status" value="BOUGHT" ${outcome?.status === "BOUGHT" ? "checked" : ""} /> ✅ Bought</label>
             <label class="outcome-option${outcome?.status === "DID_NOT_BUY" ? " selected" : ""}"><input type="radio" name="status" value="DID_NOT_BUY" ${outcome?.status === "DID_NOT_BUY" ? "checked" : ""} /> 🚫 Didn't buy</label>
-            <label class="outcome-option${outcome?.status === "STILL_DECIDING" ? " selected" : ""}"><input type="radio" name="status" value="STILL_DECIDING" ${!outcome || outcome?.status === "STILL_DECIDING" ? "checked" : ""} /> 🤔 Still deciding</label>
+            <label class="outcome-option${!outcome || outcome?.status === "STILL_DECIDING" ? " selected" : ""}"><input type="radio" name="status" value="STILL_DECIDING" ${!outcome || outcome?.status === "STILL_DECIDING" ? "checked" : ""} /> 🤔 Still deciding</label>
           </div>
+          ${outcomeOptionRow}
           <textarea name="reflection" placeholder="Optional reflection…" maxlength="1000">${escapeHtml(outcome?.reflection ?? "")}</textarea>
           <button type="submit" class="btn btn-secondary">Save outcome</button>
         </form>
       </div>`
     : outcome
-    ? `<div class="outcome-card outcome-readonly"><h3>Outcome</h3>${outcomeBadge(outcome.status)}${outcome.reflection ? `<p class="outcome-reflection">${escapeHtml(outcome.reflection)}</p>` : ""}</div>`
+    ? `<div class="outcome-card outcome-readonly"><h3>Outcome</h3>${outcomeBadge(outcome.status)}${
+        outcome.purchasedOptionId ? `<p class="outcome-purchased">Bought: ${escapeHtml(optionNameFor(options, outcome.purchasedOptionId) ?? "an option")}</p>` : ""
+      }${outcome.reflection ? `<p class="outcome-reflection">${escapeHtml(outcome.reflection)}</p>` : ""}</div>`
     : "";
 
+  const influentialId = data.influentialOpinionId ?? outcome?.influentialOpinionId ?? null;
   const opinionsList = opinions.length > 0
     ? opinions
-        .map(
-          (o) => `<div class="opinion-item" data-opinion-user="${o.userId}">
+        .map((o) => {
+          const isInfluential = influentialId === o.id;
+          const markControl = isAuthor
+            ? `<form method="post" action="/posts/${post.id}/opinions/${o.id}/influential" class="influential-mark-form">
+                <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+                <input type="hidden" name="action" value="${isInfluential ? "unmark" : "mark"}" />
+                <button type="submit" class="btn btn-ghost btn-tiny">${isInfluential ? "Unmark influential" : "Mark as influential"}</button>
+              </form>`
+            : "";
+          return `<div class="opinion-item${isInfluential ? " opinion-item-influential" : ""}" data-opinion-user="${o.userId}">
           <div class="opinion-item-head">
             <a href="/u/${encodeURIComponent(o.authorHandle)}" class="opinion-author">@${escapeHtml(o.authorHandle)}</a>
-            ${stanceBadge(o.stance, "small")}
+            ${opinionBadge(o, optionNameFor(options, o.selectedOptionId), "small")}
+            ${isInfluential ? `<span class="influential-badge" title="The buyer found this opinion influential">⭐ Influenced the decision</span>` : ""}
             <span class="opinion-time muted">${timeAgo(o.updatedAt)}</span>
           </div>
           <p class="opinion-comment">${escapeHtml(o.comment)}</p>
-        </div>`,
-        )
+          ${markControl}
+        </div>`;
+        })
         .join("\n")
     : `<p class="muted">No opinions yet — be the first to weigh in.</p>`;
 
@@ -280,9 +346,43 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       </details>`
     : "";
 
+  const demoBanner = post.isDemo
+    ? `<div class="demo-banner" role="note">🤖 Demo scenario — AI-generated fictional content</div>`
+    : "";
+
+  const contextSection = contextCard(data.context ?? null, data.contextPrompts ?? []);
+
+  const comparisonCounts = data.optionCounts ?? { counts: {}, noneCount: 0 };
+  const comparisonGrid = isComparison
+    ? `<div class="comparison-grid">
+        ${options
+          .map((opt) => purchaseOptionCard(opt, comparisonCounts.counts[opt.id] ?? 0, myOpinion?.selectedOptionId === opt.id))
+          .join("\n")}
+      </div>
+      ${comparisonCounts.noneCount > 0 ? `<p class="muted comparison-none-count">✋ ${comparisonCounts.noneCount} said none of these</p>` : ""}`
+    : "";
+
+  const relatedSection = data.relatedPosts && data.relatedPosts.length > 0
+    ? `<section class="related-section">
+        <h2>Related decisions</h2>
+        <div class="related-grid">${data.relatedPosts.map((p) => relatedDecisionCard(p)).join("\n")}</div>
+      </section>`
+    : "";
+
+  const summarySection = isComparison
+    ? comparisonGrid
+    : `<div class="opinion-summary" id="opinion-summary">
+        <div class="opinion-counts">
+          <span class="count-buy" id="count-buy">👍 ${buyCount} Buy</span>
+          <span class="count-pass" id="count-pass">👎 ${passCount} Pass</span>
+        </div>
+        <div class="stat-bar stat-bar-large"><span class="stat-bar-fill" id="buy-pct-bar" style="width:${buyPct}%"></span></div>
+      </div>`;
+
   const body = `
-<article class="post-detail" data-post-id="${post.id}">
+<article class="post-detail${isComparison ? " post-detail-comparison" : ""}" data-post-id="${post.id}" data-post-mode="${post.mode}">
   ${flashBanner(flash.message, flash.kind)}
+  ${demoBanner}
   <div class="post-detail-grid">
     <div class="post-detail-media">${gallery}</div>
     <div class="post-detail-info">
@@ -290,28 +390,26 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       <span class="post-detail-category">${escapeHtml(category.name)}</span>
       <h1>${escapeHtml(post.title)}</h1>
       <p class="post-detail-meta">by <a href="/u/${encodeURIComponent(author.handle)}">@${escapeHtml(author.handle)}</a> · ${timeAgo(post.createdAt)}</p>
-      ${price ? `<p class="post-detail-price">${escapeHtml(price)}</p>` : ""}
+      ${!isComparison && price ? `<p class="post-detail-price">${escapeHtml(price)}</p>` : ""}
       <p class="post-detail-description">${escapeHtml(post.description)}</p>
       ${post.tags.length > 0 ? `<div class="tag-row">${post.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       ${ownerControls}
 
-      <div class="opinion-summary" id="opinion-summary">
-        <div class="opinion-counts">
-          <span class="count-buy" id="count-buy">👍 ${buyCount} Buy</span>
-          <span class="count-pass" id="count-pass">👎 ${passCount} Pass</span>
-        </div>
-        <div class="stat-bar stat-bar-large"><span class="stat-bar-fill" id="buy-pct-bar" style="width:${buyPct}%"></span></div>
-      </div>
-
+      ${contextSection}
+      ${!isComparison ? summarySection : ""}
       ${opinionForm}
       ${outcomeSection}
     </div>
   </div>
 
+  ${isComparison ? `<section class="comparison-section">${summarySection}</section>` : ""}
+
   <section class="opinions-section">
     <h2>Opinions (<span id="opinion-count">${opinions.length}</span>)</h2>
     <div id="opinions-list" class="opinions-list">${opinionsList}</div>
   </section>
+
+  ${relatedSection}
 
   ${reportControl}
 </article>
@@ -319,53 +417,171 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
   return layout({ title: post.title, viewer, body, bodyClass: "page-post-detail" });
 }
 
+// ------------------------------------------------------------ demo feed ---
+
+/**
+ * Feature D's "Explore Demo" section (brief: "a clearly labelled 'Explore
+ * Demo' section," readable without registration — the route this renders
+ * from, GET /discover/demo, has no auth requirement). Reuses postCard
+ * (which already renders the 🤖 Demo tag on any post with isDemo=true)
+ * rather than a parallel card component, so a demo post's card looks
+ * exactly like a real one except for that one unmistakable tag.
+ */
+export function demoFeedPage(viewer: ViewerContext, items: DiscoverFeedItem[]): string {
+  const body = `
+<section class="discover-header demo-feed-header">
+  <h1>Explore Demo</h1>
+  <p class="muted">${items.length} fictional purchasing scenarios, written to show what Buy or Pass looks like with an active community. None of these are real people, posts, or opinions.</p>
+</section>
+${items.length > 0
+  ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div>`
+  : emptyState({ icon: "🤖", title: "No demo scenarios yet", body: "An admin hasn't seeded the demo content yet." })}`;
+  return layout({ title: "Explore Demo", viewer, body, bodyClass: "page-discover page-demo-feed" });
+}
+
 // -------------------------------------------------------- create/edit -----
+
+export interface CreateEditPostMode {
+  kind: "create" | "edit";
+  post?: Post;
+  existingImageIds?: string[];
+  existingOptions?: PurchaseOption[];
+  existingContext?: PostContext | null;
+}
+
+/** One blank/prefilled option block's HTML, reused for both the N options already on an edited post and the empty template a "+ Add option" click clones. */
+function optionFormBlock(index: number, existing?: PurchaseOption): string {
+  const priceValue = existing ? (existing.expectedPriceCents / 100).toFixed(2) : "";
+  const originalValue = existing?.originalPriceCents != null ? (existing.originalPriceCents / 100).toFixed(2) : "";
+  return `<fieldset class="option-form-block" data-option-index="${index}">
+    <legend>Option ${index + 1}</legend>
+    <label>Name
+      <input type="text" name="option_name_${index}" maxlength="80" value="${escapeHtml(existing?.name ?? "")}" placeholder="e.g. Western Mountaineering MegaLite" />
+    </label>
+    <label>Photo (optional)
+      <input type="file" name="option_image_${index}" accept="image/*" />
+    </label>
+    ${existing?.imageId ? `<img src="/images/${existing.imageId}" alt="" class="existing-image-thumb" />` : ""}
+    <div class="form-row">
+      <label>Expected price
+        <input type="number" name="option_price_${index}" min="0" step="0.01" value="${priceValue}" placeholder="0.00" />
+      </label>
+      <label>Currency
+        <input type="text" name="option_currency_${index}" maxlength="3" value="${escapeHtml(existing?.currency ?? "AUD")}" placeholder="AUD" style="text-transform:uppercase" />
+      </label>
+    </div>
+    <div class="form-row">
+      <label>Original price (optional)
+        <input type="number" name="option_original_price_${index}" min="0" step="0.01" value="${originalValue}" placeholder="0.00" />
+      </label>
+      <label>Condition (optional)
+        <input type="text" name="option_condition_${index}" maxlength="60" value="${escapeHtml(existing?.condition ?? "")}" placeholder="e.g. new, used" />
+      </label>
+    </div>
+    <label>Sale note (optional)
+      <input type="text" name="option_sale_note_${index}" maxlength="120" value="${escapeHtml(existing?.saleNote ?? "")}" placeholder="e.g. 20% off until Friday" />
+    </label>
+    <label>Source link (optional)
+      <input type="url" name="option_source_url_${index}" maxlength="500" value="${escapeHtml(existing?.sourceUrl ?? "")}" placeholder="https://…" />
+    </label>
+    <button type="button" class="btn btn-ghost btn-small remove-option-btn">Remove this option</button>
+  </fieldset>`;
+}
 
 export function createEditPostPage(
   viewer: ViewerContext,
   categories: Category[],
   error: string | null,
-  mode: { kind: "create" } | { kind: "edit"; post: Post; existingImageIds: string[] },
+  mode: CreateEditPostMode,
 ): string {
   const isEdit = mode.kind === "edit";
-  const post = isEdit ? mode.post : null;
-  const action = isEdit ? `/posts/${mode.post.id}/edit` : "/posts/new";
+  const post = mode.post ?? null;
+  const action = isEdit ? `/posts/${mode.post!.id}/edit` : "/posts/new";
+  const postMode: PostMode = post?.mode ?? "BUY_PASS";
+  const existingOptions = mode.existingOptions ?? [];
+  const existingImageIds = mode.existingImageIds ?? [];
+  const existingContext = mode.existingContext ?? null;
+
+  const optionBlocks = postMode === "WHICH_ONE"
+    ? (existingOptions.length > 0 ? existingOptions : [undefined, undefined]).map((opt, i) => optionFormBlock(i, opt)).join("\n")
+    : [0, 1].map((i) => optionFormBlock(i)).join("\n");
+
+  // Every category's context prompts are rendered, one block per category,
+  // and app.js shows only the block matching the selected <select> value —
+  // server-rendered, no per-category AJAX round-trip needed to pick prompts.
+  const contextBlocksByCategory = categories
+    .map((c) => {
+      const prompts = getContextPrompts(c.id);
+      if (prompts.length === 0) return "";
+      return `<div class="context-prompt-block" data-category-id="${c.id}" hidden>
+        ${prompts
+          .map(
+            (p) => `<label>${escapeHtml(p.label)} <span class="hint">(optional)</span>
+              <input type="text" name="context_${p.key}" maxlength="200" value="${escapeHtml(existingContext?.categoryKey === c.id ? existingContext.answers[p.key] ?? "" : "")}" placeholder="${escapeHtml(p.placeholder ?? "")}" />
+            </label>`,
+          )
+          .join("\n")}
+      </div>`;
+    })
+    .join("\n");
 
   const body = `
 <section class="form-section">
   <h1>${isEdit ? "Edit your post" : "What are you thinking about buying?"}</h1>
   <p class="muted">Keep it quick — a title, a photo or two, and why you're considering it.</p>
   ${flashBanner(error)}
-  <form method="post" action="${action}" enctype="multipart/form-data" class="form-stack post-form">
+
+  ${!isEdit
+    ? `<fieldset class="mode-fieldset">
+        <legend>What kind of post is this?</legend>
+        <label class="radio-row"><input type="radio" name="mode" value="BUY_PASS" ${postMode === "BUY_PASS" ? "checked" : ""} /> Buy or Pass — one product, a simple 👍/👎</label>
+        <label class="radio-row"><input type="radio" name="mode" value="WHICH_ONE" ${postMode === "WHICH_ONE" ? "checked" : ""} /> Which One? — compare 2-4 candidate products</label>
+      </fieldset>`
+    : `<input type="hidden" name="mode" value="${postMode}" />`}
+
+  <form method="post" action="${action}" enctype="multipart/form-data" class="form-stack post-form" data-post-mode="${postMode}">
     <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+    ${isEdit ? `<input type="hidden" name="mode" value="${postMode}" />` : ""}
 
-    <label>Product title
-      <input type="text" name="title" required maxlength="120" value="${escapeHtml(post?.title ?? "")}" placeholder="e.g. Mac mini M4 Pro for local AI dev" />
+    <label>${postMode === "WHICH_ONE" ? "Purchasing question" : "Product title"}
+      <input type="text" name="title" required maxlength="120" value="${escapeHtml(post?.title ?? "")}" placeholder="${postMode === "WHICH_ONE" ? "e.g. Which sleeping bag for a cold NZ hike?" : "e.g. Mac mini M4 Pro for local AI dev"}" />
     </label>
-
-    <label>Photos (1–4)
-      <input type="file" name="images" accept="image/*" multiple capture="environment" />
-      <span class="hint">JPEG, PNG, WebP, or GIF. Each photo is re-encoded and stripped of location/metadata.</span>
-    </label>
-    ${isEdit && mode.existingImageIds.length > 0
-      ? `<div class="existing-images">${mode.existingImageIds.map((id) => `<img src="/images/${id}" alt="" class="existing-image-thumb" />`).join("")}<p class="hint">Uploading new photos replaces these.</p></div>`
-      : ""}
-
-    <div class="form-row">
-      <label>Price (optional)
-        <input type="number" name="price" min="0" step="0.01" value="${post?.priceCents !== null && post?.priceCents !== undefined ? (post.priceCents / 100).toFixed(2) : ""}" placeholder="0.00" />
-      </label>
-      <label>Currency
-        <input type="text" name="currency" maxlength="3" value="${escapeHtml(post?.currency ?? "AUD")}" placeholder="AUD" style="text-transform:uppercase" />
-      </label>
-    </div>
 
     <label>Category
-      <select name="category" required>
+      <select name="category" required id="category-select">
         <option value="" disabled ${!post ? "selected" : ""}>Choose a category…</option>
         ${categoryOptions(categories, post?.categoryId)}
       </select>
     </label>
+
+    <div class="context-prompts-container" id="context-prompts-container">${contextBlocksByCategory}</div>
+    <label>Anything else relevant? <span class="hint">(optional)</span>
+      <textarea name="context_free_text" maxlength="500" placeholder="Anything that doesn't fit the prompts above">${escapeHtml(existingContext?.freeText ?? "")}</textarea>
+    </label>
+
+    <div class="single-product-fields"${postMode === "WHICH_ONE" ? " hidden" : ""}>
+      <label>Photos (1–4)
+        <input type="file" name="images" accept="image/*" multiple capture="environment" />
+        <span class="hint">JPEG, PNG, WebP, or GIF. Each photo is re-encoded and stripped of location/metadata.</span>
+      </label>
+      ${isEdit && existingImageIds.length > 0
+        ? `<div class="existing-images">${existingImageIds.map((id) => `<img src="/images/${id}" alt="" class="existing-image-thumb" />`).join("")}<p class="hint">Uploading new photos replaces these.</p></div>`
+        : ""}
+
+      <div class="form-row">
+        <label>Price (optional)
+          <input type="number" name="price" min="0" step="0.01" value="${post?.priceCents !== null && post?.priceCents !== undefined ? (post.priceCents / 100).toFixed(2) : ""}" placeholder="0.00" />
+        </label>
+        <label>Currency
+          <input type="text" name="currency" maxlength="3" value="${escapeHtml(post?.currency ?? "AUD")}" placeholder="AUD" style="text-transform:uppercase" />
+        </label>
+      </div>
+    </div>
+
+    <div class="comparison-fields"${postMode === "BUY_PASS" ? " hidden" : ""}>
+      <div class="option-form-blocks" id="option-form-blocks">${optionBlocks}</div>
+      <button type="button" class="btn btn-ghost btn-small" id="add-option-btn">+ Add another option (up to 4)</button>
+    </div>
 
     <label>Tags (optional, comma-separated)
       <input type="text" name="tags" maxlength="200" value="${escapeHtml((post?.tags ?? []).join(", "))}" placeholder="developer-hardware, local-ai" />
@@ -395,7 +611,7 @@ export interface ProfileData {
   interests: Category[];
   allCategories: Category[];
   authoredPosts: DiscoverFeedItem[];
-  opinionsGiven: { opinion: Opinion; post: Post }[];
+  opinionsGiven: { opinion: Opinion; post: Post; optionName: string | null }[];
   purchaseOutcomes: { post: Post; outcome: PostOutcome }[];
 }
 
@@ -480,7 +696,7 @@ ${isOwnProfile
         ? `<div class="activity-list">${opinionsGiven
             .map(
               (o) => `<a href="/posts/${o.post.id}" class="activity-row">
-              ${stanceBadge(o.opinion.stance, "small")}
+              ${opinionBadge(o.opinion, o.optionName, "small")}
               <span>${escapeHtml(o.post.title)}</span>
               <span class="muted">${timeAgo(o.opinion.updatedAt)}</span>
             </a>`,

@@ -3,8 +3,9 @@
 // strings, not a templating engine — consistent with the zero-framework
 // stack, and every user-authored value passed through escapeHtml() at the
 // call site before it reaches here.
-import type { Category, Post } from "./db.ts";
+import type { Category, Post, PostContext, PurchaseOption } from "./db.ts";
 import type { User } from "./db.ts";
+import type { ContextPrompt } from "./context-prompts.ts";
 import { escapeHtml } from "./validation.ts";
 
 export interface ViewerContext {
@@ -116,6 +117,27 @@ export function stanceBadge(stance: "BUY" | "PASS", size: "small" | "normal" = "
   return `<span class="${cls}${sizeCls}">${icon} ${label}</span>`;
 }
 
+/**
+ * Renders whichever of the three opinion shapes a given opinion actually
+ * has (brief: an opinion is exactly one of BUY/PASS, a selected option, or
+ * "none of these" — never ambiguous). optionName is only needed when the
+ * opinion selected a specific option; callers pass it from their own
+ * already-loaded purchase_options list rather than this function querying
+ * the database itself.
+ */
+export function opinionBadge(
+  opinion: { stance: "BUY" | "PASS" | null; selectedOptionId: string | null; selectedNone: boolean },
+  optionName: string | null,
+  size: "small" | "normal" = "normal",
+): string {
+  if (opinion.stance) return stanceBadge(opinion.stance, size);
+  const sizeCls = size === "small" ? " stance-badge-small" : "";
+  if (opinion.selectedNone) {
+    return `<span class="stance-badge stance-none${sizeCls}">✋ None of these</span>`;
+  }
+  return `<span class="stance-badge stance-selected${sizeCls}">✅ ${escapeHtml(optionName ?? "an option")}</span>`;
+}
+
 export function outcomeBadge(status: "BOUGHT" | "DID_NOT_BUY" | "STILL_DECIDING"): string {
   const map = {
     BOUGHT: { icon: "✅", label: "Bought it", cls: "outcome-bought" },
@@ -133,10 +155,11 @@ export function postCard(
   const price = formatPrice(post.priceCents, post.currency);
   const total = opts.buyCount + opts.passCount;
   const buyPct = total > 0 ? Math.round((opts.buyCount / total) * 100) : null;
-  return `<a href="/posts/${post.id}" class="post-card">
+  return `<a href="/posts/${post.id}" class="post-card${post.isDemo ? " post-card-demo" : ""}">
   <div class="post-card-image">
     ${opts.coverImageId ? `<img src="/images/${opts.coverImageId}" alt="" loading="lazy" />` : `<div class="post-card-image-placeholder">🛍️</div>`}
     ${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted</span>` : ""}
+    ${post.isDemo ? `<span class="post-card-tag demo-tag-overlay">🤖 Demo</span>` : ""}
     <span class="post-card-category">${escapeHtml(opts.categoryName)}</span>
   </div>
   <div class="post-card-body">
@@ -169,4 +192,77 @@ export function categoryOptions(categories: Category[], selectedId?: string): st
 export function flashBanner(message: string | null, kind: "error" | "success" = "error"): string {
   if (!message) return "";
   return `<div class="flash flash-${kind}" role="alert">${escapeHtml(message)}</div>`;
+}
+
+/**
+ * Feature A's "About this decision" context cards. Renders only the
+ * prompts the buyer actually answered, in the category's own defined
+ * order — per the brief's explicit "do not display empty prompt fields as
+ * distracting blank cards" rule, enforced here by simply never emitting a
+ * card for an unanswered key, not by a CSS hide rule over an empty one.
+ */
+export function contextCard(context: PostContext | null, prompts: ContextPrompt[]): string {
+  if (!context) return "";
+  const answeredCards = prompts
+    .filter((p) => context.answers[p.key]?.trim())
+    .map((p) => `<div class="context-item"><span class="context-label">${escapeHtml(p.label)}</span><p class="context-value">${escapeHtml(context.answers[p.key])}</p></div>`);
+  const freeTextCard = context.freeText.trim()
+    ? `<div class="context-item context-item-freetext"><span class="context-label">More details</span><p class="context-value">${escapeHtml(context.freeText)}</p></div>`
+    : "";
+  if (answeredCards.length === 0 && !freeTextCard) return "";
+  return `<section class="context-section">
+    <h3>About this decision</h3>
+    <div class="context-grid">${answeredCards.join("\n")}${freeTextCard}</div>
+  </section>`;
+}
+
+/**
+ * One candidate in a WHICH_ONE comparison. Price fields follow the brief's
+ * three-way distinction exactly: expected (what this buyer expects to pay,
+ * always shown), original (a claimed list price, shown struck through only
+ * if supplied), and a sale note as plain text — never a computed "% off"
+ * framing that would imply a bigger discount is automatically the better
+ * decision.
+ */
+export function purchaseOptionCard(option: PurchaseOption, voteCount: number, isMySelection: boolean): string {
+  const expected = formatPrice(option.expectedPriceCents, option.currency);
+  const original = option.originalPriceCents !== null ? formatPrice(option.originalPriceCents, option.currency) : null;
+  const specs = option.specifications
+    ? Object.entries(option.specifications)
+        .filter(([, v]) => v && v.trim())
+        .map(([k, v]) => `<li><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v)}</li>`)
+        .join("")
+    : "";
+  return `<div class="purchase-option-card${isMySelection ? " purchase-option-selected" : ""}" data-option-id="${option.id}">
+    ${option.imageId ? `<img src="/images/${option.imageId}" alt="" class="purchase-option-image" />` : `<div class="purchase-option-image-placeholder">🛍️</div>`}
+    <h4 class="purchase-option-name">${escapeHtml(option.name)}</h4>
+    <p class="purchase-option-price">
+      ${expected ? escapeHtml(expected) : ""}
+      ${original ? `<span class="purchase-option-original-price">${escapeHtml(original)}</span>` : ""}
+    </p>
+    ${option.saleNote ? `<p class="purchase-option-sale-note">${escapeHtml(option.saleNote)}</p>` : ""}
+    ${option.condition ? `<p class="purchase-option-condition">Condition: ${escapeHtml(option.condition)}</p>` : ""}
+    ${option.sourceUrl ? `<p class="purchase-option-source"><a href="${escapeHtml(option.sourceUrl)}" rel="nofollow noopener" target="_blank">View source ↗</a></p>` : ""}
+    ${specs ? `<ul class="purchase-option-specs">${specs}</ul>` : ""}
+    <p class="purchase-option-vote-count">${voteCount} opinion${voteCount === 1 ? "" : "s"}${isMySelection ? " · your pick" : ""}</p>
+  </div>`;
+}
+
+/** Persistent banner, not a dismissible tag, per the brief's exact required wording. */
+export function demoLabel(): string {
+  return `<span class="demo-tag">🤖 Demo scenario — AI-generated</span>`;
+}
+
+/**
+ * Feature C's compact "related decisions" card — deliberately minimal
+ * (title, category, live opinion counts are fetched client-side-free by
+ * just linking through) since the point is discovery, not duplicating the
+ * full post-detail content here.
+ */
+export function relatedDecisionCard(post: Post): string {
+  return `<a href="/posts/${post.id}" class="related-decision-card">
+    ${post.isDemo ? demoLabel() : ""}
+    <h4>${escapeHtml(post.title)}</h4>
+    <p class="muted">${escapeHtml(post.description.slice(0, 100))}${post.description.length > 100 ? "…" : ""}</p>
+  </a>`;
 }

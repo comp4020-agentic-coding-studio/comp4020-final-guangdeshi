@@ -29,23 +29,31 @@ import {
 } from "./auth.ts";
 import {
   anyAdminExists,
+  createDemoUser,
   createPost,
   createReport,
   createUser,
   deleteExpiredSessions,
   deleteOpinion,
+  deletePostContext,
   getCategoryById,
+  getDemoFeed,
   getOpinionById,
   getOpinionByPostAndUser,
   getOpinionCounts,
+  getOptionCounts,
   getOutcome,
   getPostById,
+  getPostContext,
+  getPurchaseOptionById,
+  getPurchaseOptionsForPost,
   getImageById,
   getPostImageIds,
   getUserByEmail,
   getUserByHandle,
   getUserById,
   getUserInterests,
+  indexPostForSearch,
   listCategories,
   listFeed,
   listMostDiscussed,
@@ -56,25 +64,37 @@ import {
   activityStats,
   listReports,
   promoteToAdmin,
+  removePostFromSearchIndex,
   resolveReport,
+  searchPosts,
+  setInfluentialOpinion,
+  setPostContext,
+  setPurchaseOptions,
   setUserInterests,
   softDeletePost,
   updatePost,
   updateUserPassword,
   updateUserProfile,
+  upsertComparisonOpinion,
   upsertOpinion,
   upsertOutcome,
+  type ComparisonSelection,
+  type NewPurchaseOption,
   type Post,
+  type PostMode,
   type PostOutcome,
   type User,
 } from "./db.ts";
+import { CONTEXT_SCHEMA_VERSION, getContextPrompts, getSubtypeSuggestions } from "./context-prompts.ts";
 import { ImageValidationError, processAndStoreImage, readImageFile } from "./images.ts";
 import { logEvent } from "./logger.ts";
+import { seedDemoContent } from "../scripts/seed-demo-content.ts";
 import { MultipartError, parseMultipart } from "./multipart.ts";
 import { renderMarkdown, renderReadmePage } from "./markdown.ts";
 import {
   adminPage,
   createEditPostPage,
+  demoFeedPage,
   discoverPage,
   errorPage,
   landingPage,
@@ -89,7 +109,16 @@ import {
 } from "./pages.ts";
 import { recommendationService } from "./recommendation/chronological.ts";
 import { addLogClient, addPostClient, broadcastToPost, sseClientCounts, startHeartbeat } from "./sse.ts";
-import { normalizeTags, validateOpinionInput, validateOutcomeInput, validatePostInput } from "./validation.ts";
+import {
+  normalizeTags,
+  validateComparisonOpinionInput,
+  validateContextAnswers,
+  validateOpinionInput,
+  validateOutcomeInput,
+  validatePostInput,
+  validatePurchaseOptionCount,
+  validatePurchaseOptionInput,
+} from "./validation.ts";
 import type { ViewerContext } from "./render.ts";
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -307,6 +336,7 @@ async function handle(ctx: RequestContext): Promise<void> {
 
   // ---- discover ----
   if (method === "GET" && path === "/discover") return handleDiscover(ctx);
+  if (method === "GET" && path === "/discover/demo") return handleDemoFeed(ctx);
 
   // ---- posts ----
   if (method === "GET" && path === "/posts/new") return handleNewPostForm(ctx);
@@ -324,6 +354,8 @@ async function handle(ctx: RequestContext): Promise<void> {
     if (method === "POST" && sub === "/outcome") return handleSetOutcome(ctx, postId);
     if (method === "POST" && sub === "/report") return handleReportPost(ctx, postId);
     if (method === "GET" && sub === "/events") return handlePostEvents(ctx, postId);
+    const influentialMatch = sub.match(/^\/opinions\/([a-f0-9-]{36})\/influential$/);
+    if (method === "POST" && influentialMatch) return handleSetInfluentialOpinion(ctx, postId, influentialMatch[1]);
   }
 
   const opinionMatch = path.match(/^\/opinions\/([a-f0-9-]{36})\/(edit|delete)$/);
@@ -347,6 +379,7 @@ async function handle(ctx: RequestContext): Promise<void> {
   const reportResolveMatch = path.match(/^\/admin\/api\/reports\/([a-f0-9-]{36})\/resolve$/);
   if (method === "POST" && reportResolveMatch) return handleAdminResolveReport(ctx, reportResolveMatch[1]);
   if (method === "POST" && path === "/admin/bootstrap") return handleAdminBootstrap(ctx);
+  if (method === "POST" && path === "/admin/demo/seed") return handleAdminSeedDemo(ctx);
 
   throw new HttpError(404, "not found");
 }
@@ -518,6 +551,15 @@ function handleDiscover(ctx: RequestContext): void {
   sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), { categoryId, search, sort: "recent" }, result.nextCursor));
 }
 
+/**
+ * Feature D's "Explore Demo" section — readable by anyone, no auth check,
+ * per the brief's "allow visitors to read demo cases without registration."
+ */
+function handleDemoFeed(ctx: RequestContext): void {
+  const items = getDemoFeed(30).map(toDiscoverItem);
+  sendHtml(ctx.res, 200, demoFeedPage(viewerContextOf(ctx), items));
+}
+
 // ---------------------------------------------------------------- posts ---
 
 function handleNewPostForm(ctx: RequestContext): void {
@@ -525,32 +567,142 @@ function handleNewPostForm(ctx: RequestContext): void {
   sendHtml(ctx.res, 200, createEditPostPage(viewerContextOf(ctx), listCategories(), null, { kind: "create" }));
 }
 
+function parsePrice(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100);
+}
+
+/** Pulls the fields.option_name_0, option_price_0, ... fields back into an array of raw per-option inputs, for up to 4 option indices. Stops scanning once an index has no name field at all, so trailing empty "+ Add option" blocks the user never filled in are simply ignored rather than producing validation errors. */
+function parseOptionInputsFromFields(fields: Record<string, any>): Array<{
+  name: unknown;
+  expectedPriceCents: unknown;
+  currency: unknown;
+  originalPriceCents: unknown;
+  condition: unknown;
+  sourceUrl: unknown;
+  saleNote: unknown;
+}> {
+  const options: ReturnType<typeof parseOptionInputsFromFields> = [];
+  for (let i = 0; i < 4; i++) {
+    const name = fields[`option_name_${i}`];
+    if (typeof name !== "string" || name.trim().length === 0) continue;
+    options.push({
+      name,
+      expectedPriceCents: parsePrice(fields[`option_price_${i}`]),
+      currency: String(fields[`option_currency_${i}`] ?? "AUD").toUpperCase(),
+      originalPriceCents: parsePrice(fields[`option_original_price_${i}`]),
+      condition: fields[`option_condition_${i}`] || null,
+      sourceUrl: fields[`option_source_url_${i}`] || null,
+      saleNote: fields[`option_sale_note_${i}`] || null,
+    });
+  }
+  return options;
+}
+
+/** Collects context_<key> fields into a plain answers map, dropping blanks — an unanswered prompt should never become a stored empty-string answer (that's exactly the "blank card" the brief says never to render). */
+function parseContextAnswersFromFields(fields: Record<string, any>, categoryId: string): Record<string, string> {
+  const prompts = getContextPrompts(categoryId);
+  const answers: Record<string, string> = {};
+  for (const p of prompts) {
+    const raw = fields[`context_${p.key}`];
+    if (typeof raw === "string" && raw.trim().length > 0) answers[p.key] = raw.trim();
+  }
+  return answers;
+}
+
 async function handleCreatePost(ctx: RequestContext): Promise<void> {
   const auth = requireAuth(ctx);
   const body = await parseBody(ctx.req);
   requireCsrf(ctx.req, body, auth);
 
+  const postMode: PostMode = body.fields.mode === "WHICH_ONE" ? "WHICH_ONE" : "BUY_PASS";
   const tags = normalizeTags(String(body.fields.tags ?? "").split(",").map((t) => t.trim()).filter(Boolean));
+  const categoryId = String(body.fields.category ?? "");
+  const freeText = String(body.fields.context_free_text ?? "").trim();
+  const contextAnswers = parseContextAnswersFromFields(body.fields, categoryId);
+
+  const rerenderError = (message: string, status = 400) => {
+    log(ctx, "post.created", "failure", { meta: { reason: message } });
+    sendHtml(ctx.res, status, createEditPostPage(viewerContextOf(ctx), listCategories(), message, { kind: "create" }));
+  };
+
+  if (postMode === "WHICH_ONE") {
+    const rawOptions = parseOptionInputsFromFields(body.fields);
+    const countCheck = validatePurchaseOptionCount(rawOptions.length);
+    const optionErrors = rawOptions.flatMap((o, i) => validatePurchaseOptionInput(o, i).errors);
+    const input = {
+      title: String(body.fields.title ?? "").trim(),
+      description: String(body.fields.description ?? "").trim(),
+      priceCents: null,
+      currency: null,
+      categoryId,
+      tags,
+      visibility: body.fields.visibility === "unlisted" ? "unlisted" : "public",
+    } as const;
+    const postValidation = validatePostInput(input);
+    const contextValidation = validateContextAnswers(categoryId, null, contextAnswers, freeText);
+    const allErrors = [...postValidation.errors, ...countCheck.errors, ...optionErrors, ...contextValidation.errors];
+    if (allErrors.length > 0) return rerenderError(allErrors.join(" "));
+
+    const optionImageFiles = body.files.filter((f) => f.fieldname.startsWith("option_image_"));
+    let optionImageIds: Record<number, string> = {};
+    try {
+      const results = await Promise.all(
+        optionImageFiles.map(async (f) => {
+          const index = Number(f.fieldname.replace("option_image_", ""));
+          const row = await processAndStoreImage(auth.user.id, f.buffer);
+          return [index, row.id] as const;
+        }),
+      );
+      optionImageIds = Object.fromEntries(results);
+    } catch (err) {
+      const message = err instanceof ImageValidationError ? err.message : "could not process an option photo";
+      return rerenderError(message);
+    }
+
+    const post = createPost({ authorId: auth.user.id, ...input, mode: "WHICH_ONE" }, []);
+    const newOptions: NewPurchaseOption[] = rawOptions.map((o, i) => ({
+      name: (o.name as string).trim(),
+      imageId: optionImageIds[i] ?? null,
+      expectedPriceCents: o.expectedPriceCents as number,
+      currency: o.currency as string,
+      originalPriceCents: o.originalPriceCents as number | null,
+      condition: o.condition as string | null,
+      sourceUrl: o.sourceUrl as string | null,
+      saleNote: o.saleNote as string | null,
+    }));
+    setPurchaseOptions(post.id, newOptions);
+    if (Object.keys(contextAnswers).length > 0 || freeText) {
+      setPostContext(post.id, CONTEXT_SCHEMA_VERSION, categoryId, contextAnswers, freeText);
+    }
+    indexPostForSearch(post.id, post.title, post.description, [...Object.values(contextAnswers), freeText].join(" "));
+    log(ctx, "post.created", "success", { targetType: "post", targetId: post.id, meta: { mode: "WHICH_ONE" } });
+    redirect(ctx.res, `/posts/${post.id}`);
+    return;
+  }
+
   const priceCents = parsePrice(body.fields.price);
   const input = {
     title: String(body.fields.title ?? "").trim(),
     description: String(body.fields.description ?? "").trim(),
     priceCents,
     currency: priceCents !== null ? String(body.fields.currency ?? "AUD").toUpperCase() : null,
-    categoryId: String(body.fields.category ?? ""),
+    categoryId,
     tags,
     visibility: body.fields.visibility === "unlisted" ? "unlisted" : "public",
   } as const;
 
   const validation = validatePostInput(input);
+  const contextValidation = validateContextAnswers(categoryId, null, contextAnswers, freeText);
+  validation.errors.push(...contextValidation.errors);
   const imageFiles = body.files.filter((f) => f.fieldname === "images");
   if (imageFiles.length === 0) validation.errors.push("at least one photo is required");
   if (imageFiles.length > 4) validation.errors.push("at most 4 photos are allowed");
 
-  if (!validation.ok || imageFiles.length === 0 || imageFiles.length > 4) {
-    log(ctx, "post.created", "failure", { meta: { reason: validation.errors.join("; ") } });
-    sendHtml(ctx.res, 400, createEditPostPage(viewerContextOf(ctx), listCategories(), validation.errors.join(" "), { kind: "create" }));
-    return;
+  if (validation.errors.length > 0 || imageFiles.length === 0 || imageFiles.length > 4) {
+    return rerenderError(validation.errors.join(" "));
   }
 
   let imageIds: string[];
@@ -558,21 +710,16 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
     imageIds = await Promise.all(imageFiles.map((f) => processAndStoreImage(auth.user.id, f.buffer))).then((rows) => rows.map((r) => r.id));
   } catch (err) {
     const message = err instanceof ImageValidationError ? err.message : "could not process uploaded images";
-    log(ctx, "post.created", "failure", { meta: { reason: message } });
-    sendHtml(ctx.res, 400, createEditPostPage(viewerContextOf(ctx), listCategories(), message, { kind: "create" }));
-    return;
+    return rerenderError(message);
   }
 
-  const post = createPost({ authorId: auth.user.id, ...input }, imageIds);
+  const post = createPost({ authorId: auth.user.id, ...input, mode: "BUY_PASS" }, imageIds);
+  if (Object.keys(contextAnswers).length > 0 || freeText) {
+    setPostContext(post.id, CONTEXT_SCHEMA_VERSION, categoryId, contextAnswers, freeText);
+  }
+  indexPostForSearch(post.id, post.title, post.description, [...Object.values(contextAnswers), freeText].join(" "));
   log(ctx, "post.created", "success", { targetType: "post", targetId: post.id });
   redirect(ctx.res, `/posts/${post.id}`);
-}
-
-function parsePrice(raw: unknown): number | null {
-  if (raw === undefined || raw === null || raw === "") return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 100);
 }
 
 function handlePostDetail(ctx: RequestContext, postId: string): void {
@@ -586,6 +733,18 @@ function handlePostDetail(ctx: RequestContext, postId: string): void {
   const opinions = listOpinionsForPost(post.id);
   const myOpinion = ctx.auth ? getOpinionByPostAndUser(post.id, ctx.auth.user.id) ?? null : null;
   const outcome = getOutcome(post.id) ?? null;
+  const options = post.mode === "WHICH_ONE" ? getPurchaseOptionsForPost(post.id) : [];
+  const optionCounts = post.mode === "WHICH_ONE" ? getOptionCounts(post.id) : undefined;
+  const context = getPostContext(post.id) ?? null;
+  const contextPrompts = getContextPrompts(post.categoryId);
+  // Related decisions are a courtesy, not load-bearing — a search-index
+  // hiccup must never break viewing the post itself.
+  let relatedPosts: Post[] = [];
+  try {
+    relatedPosts = searchPosts(post.title, { excludePostId: post.id, limit: 4 }).map((r) => r.post);
+  } catch {
+    relatedPosts = [];
+  }
 
   log(ctx, "post.opened", "success", { targetType: "post", targetId: post.id });
 
@@ -605,6 +764,11 @@ function handlePostDetail(ctx: RequestContext, postId: string): void {
         myOpinion,
         outcome,
         shareUrl: `${ctx.url.origin}/posts/${post.id}`,
+        options,
+        optionCounts,
+        context,
+        contextPrompts,
+        relatedPosts,
       },
       { message: ctx.url.searchParams.get("msg"), kind: (ctx.url.searchParams.get("kind") as "error" | "success") ?? "error" },
     ),
@@ -620,7 +784,19 @@ function handleEditPostForm(ctx: RequestContext, postId: string): void {
     throw new HttpError(403, "you can only edit your own posts");
   }
   const imageIds = getPostImageIds(post.id);
-  sendHtml(ctx.res, 200, createEditPostPage(viewerContextOf(ctx), listCategories(), null, { kind: "edit", post, existingImageIds: imageIds }));
+  const existingOptions = post.mode === "WHICH_ONE" ? getPurchaseOptionsForPost(post.id) : [];
+  const existingContext = getPostContext(post.id) ?? null;
+  sendHtml(
+    ctx.res,
+    200,
+    createEditPostPage(viewerContextOf(ctx), listCategories(), null, {
+      kind: "edit",
+      post,
+      existingImageIds: imageIds,
+      existingOptions,
+      existingContext,
+    }),
+  );
 }
 
 async function handleUpdatePost(ctx: RequestContext, postId: string): Promise<void> {
@@ -641,42 +817,116 @@ async function handleUpdatePost(ctx: RequestContext, postId: string): Promise<vo
   }
 
   const tags = normalizeTags(String(body.fields.tags ?? "").split(",").map((t) => t.trim()).filter(Boolean));
+  const categoryId = String(body.fields.category ?? "");
+  const freeText = String(body.fields.context_free_text ?? "").trim();
+  const contextAnswers = parseContextAnswersFromFields(body.fields, categoryId);
+  const contextValidation = validateContextAnswers(categoryId, null, contextAnswers, freeText);
+
+  const rerenderEditError = (message: string) => {
+    log(ctx, "post.updated", "failure", { targetType: "post", targetId: postId, meta: { reason: message } });
+    sendHtml(
+      ctx.res,
+      400,
+      createEditPostPage(viewerContextOf(ctx), listCategories(), message, {
+        kind: "edit",
+        post,
+        existingImageIds: getPostImageIds(post.id),
+        existingOptions: post.mode === "WHICH_ONE" ? getPurchaseOptionsForPost(post.id) : [],
+        existingContext: getPostContext(post.id) ?? null,
+      }),
+    );
+  };
+
+  if (post.mode === "WHICH_ONE") {
+    const rawOptions = parseOptionInputsFromFields(body.fields);
+    const countCheck = validatePurchaseOptionCount(rawOptions.length);
+    const optionErrors = rawOptions.flatMap((o, i) => validatePurchaseOptionInput(o, i).errors);
+    const input = {
+      title: String(body.fields.title ?? "").trim(),
+      description: String(body.fields.description ?? "").trim(),
+      priceCents: null,
+      currency: null,
+      categoryId,
+      tags,
+      visibility: body.fields.visibility === "unlisted" ? "unlisted" : "public",
+    } as const;
+    const postValidation = validatePostInput(input);
+    const allErrors = [...postValidation.errors, ...countCheck.errors, ...optionErrors, ...contextValidation.errors];
+    if (allErrors.length > 0) return rerenderEditError(allErrors.join(" "));
+
+    const existingOptions = getPurchaseOptionsForPost(postId);
+    const optionImageFiles = body.files.filter((f) => f.fieldname.startsWith("option_image_"));
+    const optionImageIds: Record<number, string> = {};
+    try {
+      for (const f of optionImageFiles) {
+        const index = Number(f.fieldname.replace("option_image_", ""));
+        const row = await processAndStoreImage(auth.user.id, f.buffer);
+        optionImageIds[index] = row.id;
+      }
+    } catch (err) {
+      const message = err instanceof ImageValidationError ? err.message : "could not process an option photo";
+      return rerenderEditError(message);
+    }
+
+    updatePost(postId, input);
+    const newOptions: NewPurchaseOption[] = rawOptions.map((o, i) => ({
+      name: (o.name as string).trim(),
+      imageId: optionImageIds[i] ?? existingOptions[i]?.imageId ?? null,
+      expectedPriceCents: o.expectedPriceCents as number,
+      currency: o.currency as string,
+      originalPriceCents: o.originalPriceCents as number | null,
+      condition: o.condition as string | null,
+      sourceUrl: o.sourceUrl as string | null,
+      saleNote: o.saleNote as string | null,
+    }));
+    setPurchaseOptions(postId, newOptions);
+    if (Object.keys(contextAnswers).length > 0 || freeText) {
+      setPostContext(postId, CONTEXT_SCHEMA_VERSION, categoryId, contextAnswers, freeText);
+    } else {
+      deletePostContext(postId);
+    }
+    indexPostForSearch(postId, input.title, input.description, [...Object.values(contextAnswers), freeText].join(" "));
+    log(ctx, "post.updated", "success", { targetType: "post", targetId: postId });
+    broadcastToPost(postId, "post-updated", { postId });
+    redirect(ctx.res, `/posts/${postId}`);
+    return;
+  }
+
   const priceCents = parsePrice(body.fields.price);
   const input = {
     title: String(body.fields.title ?? "").trim(),
     description: String(body.fields.description ?? "").trim(),
     priceCents,
     currency: priceCents !== null ? String(body.fields.currency ?? "AUD").toUpperCase() : null,
-    categoryId: String(body.fields.category ?? ""),
+    categoryId,
     tags,
     visibility: body.fields.visibility === "unlisted" ? "unlisted" : "public",
   } as const;
 
   const validation = validatePostInput(input);
-  if (!validation.ok) {
-    log(ctx, "post.updated", "failure", { targetType: "post", targetId: postId, meta: { reason: validation.errors.join("; ") } });
-    sendHtml(ctx.res, 400, createEditPostPage(viewerContextOf(ctx), listCategories(), validation.errors.join(" "), { kind: "edit", post, existingImageIds: getPostImageIds(post.id) }));
-    return;
-  }
+  validation.errors.push(...contextValidation.errors);
+  if (validation.errors.length > 0) return rerenderEditError(validation.errors.join(" "));
 
   const imageFiles = body.files.filter((f) => f.fieldname === "images");
   let imageIds: string[] | undefined;
   if (imageFiles.length > 0) {
-    if (imageFiles.length > 4) {
-      sendHtml(ctx.res, 400, createEditPostPage(viewerContextOf(ctx), listCategories(), "at most 4 photos are allowed", { kind: "edit", post, existingImageIds: getPostImageIds(post.id) }));
-      return;
-    }
+    if (imageFiles.length > 4) return rerenderEditError("at most 4 photos are allowed");
     try {
       const rows = await Promise.all(imageFiles.map((f) => processAndStoreImage(auth.user.id, f.buffer)));
       imageIds = rows.map((r) => r.id);
     } catch (err) {
       const message = err instanceof ImageValidationError ? err.message : "could not process uploaded images";
-      sendHtml(ctx.res, 400, createEditPostPage(viewerContextOf(ctx), listCategories(), message, { kind: "edit", post, existingImageIds: getPostImageIds(post.id) }));
-      return;
+      return rerenderEditError(message);
     }
   }
 
   const updated = updatePost(postId, input, imageIds);
+  if (Object.keys(contextAnswers).length > 0 || freeText) {
+    setPostContext(postId, CONTEXT_SCHEMA_VERSION, categoryId, contextAnswers, freeText);
+  } else {
+    deletePostContext(postId);
+  }
+  indexPostForSearch(postId, updated.title, updated.description, [...Object.values(contextAnswers), freeText].join(" "));
   log(ctx, "post.updated", "success", { targetType: "post", targetId: updated.id });
   broadcastToPost(postId, "post-updated", { postId });
   redirect(ctx.res, `/posts/${postId}`);
@@ -694,6 +944,7 @@ async function handleDeletePost(ctx: RequestContext, postId: string): Promise<vo
     throw new HttpError(403, "you can only delete your own posts");
   }
   softDeletePost(postId);
+  removePostFromSearchIndex(postId);
   log(ctx, "post.deleted", "success", { targetType: "post", targetId: postId });
   redirect(ctx.res, "/discover");
 }
@@ -711,9 +962,21 @@ async function handleSubmitOpinion(ctx: RequestContext, postId: string): Promise
   // Post authors do not vote on their own posts (brief §8 default): opinions
   // exist to surface outside perspectives, and an author's own thumbs-up
   // would be a confirmation of their own thinking, not community input.
+  // Applies identically to both modes.
   if (post.authorId === auth.user.id) {
     log(ctx, "authorization.denied", "failure", { targetType: "post", targetId: postId, meta: { attempted: "self_opinion" } });
     throw new HttpError(403, "post authors can't submit an opinion on their own post");
+  }
+
+  if (post.mode === "WHICH_ONE") return handleSubmitComparisonOpinion(ctx, post, body);
+
+  // A BUY_PASS post must receive a BUY_PASS-shaped submission — a
+  // hand-crafted request sending selectedOptionId at a single-product post
+  // is rejected the same way a missing stance would be, not silently
+  // reinterpreted.
+  if (typeof body.fields.selectedOptionId === "string") {
+    log(ctx, "authorization.denied", "failure", { targetType: "post", targetId: postId, meta: { attempted: "comparison_opinion_on_buy_pass_post" } });
+    throw new HttpError(400, "this post does not accept a comparison selection");
   }
 
   const input = { stance: body.fields.stance, comment: typeof body.fields.comment === "string" ? body.fields.comment.trim() : body.fields.comment };
@@ -739,6 +1002,69 @@ async function handleSubmitOpinion(ctx: RequestContext, postId: string): Promise
   });
 
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { opinion, counts });
+  redirect(ctx.res, `/posts/${postId}`);
+}
+
+async function handleSubmitComparisonOpinion(ctx: RequestContext, post: Post, body: ParsedBody): Promise<void> {
+  const auth = requireAuth(ctx);
+  const postId = post.id;
+
+  // A WHICH_ONE post must receive a comparison-shaped submission — a
+  // hand-crafted BUY/PASS stance at a comparison post is rejected rather
+  // than silently coerced into a selection.
+  if (typeof body.fields.stance === "string") {
+    log(ctx, "authorization.denied", "failure", { targetType: "post", targetId: postId, meta: { attempted: "buy_pass_opinion_on_comparison_post" } });
+    throw new HttpError(400, "this post requires picking one of the options, not a Buy/Pass stance");
+  }
+
+  const rawSelection = body.fields.selectedOptionId;
+  const input = { selectedOptionId: rawSelection, comment: typeof body.fields.comment === "string" ? body.fields.comment.trim() : body.fields.comment };
+  const validation = validateComparisonOpinionInput(input);
+  if (!validation.ok) {
+    if (wantsJson(ctx.req)) return sendJson(ctx.res, 400, { errors: validation.errors });
+    redirect(ctx.res, `/posts/${postId}?kind=error&msg=${encodeURIComponent(validation.errors.join(" "))}`);
+    return;
+  }
+
+  let selection: ComparisonSelection;
+  if (rawSelection === "none") {
+    selection = { none: true };
+  } else {
+    const option = getPurchaseOptionById(rawSelection as string);
+    // Rejects both a fabricated id and a real option id that belongs to a
+    // DIFFERENT post — brief's explicit "selections belonging to another
+    // post" rule, checked by actually loading the option and comparing its
+    // own post_id, not by trusting the client's claim.
+    if (!option || option.postId !== postId) {
+      log(ctx, "authorization.denied", "failure", { targetType: "post", targetId: postId, meta: { attempted: "invalid_option_id" } });
+      throw new HttpError(400, "that option does not belong to this post");
+    }
+    selection = { optionId: option.id };
+  }
+
+  const existing = getOpinionByPostAndUser(postId, auth.user.id);
+  const opinion = upsertComparisonOpinion(postId, auth.user.id, selection, input.comment as string);
+  log(ctx, existing ? "opinion.updated" : "opinion.created", "success", {
+    targetType: "opinion",
+    targetId: opinion.id,
+    meta: { postId, selectedOptionId: opinion.selectedOptionId, selectedNone: opinion.selectedNone },
+  });
+
+  const optionCounts = getOptionCounts(postId);
+  broadcastToPost(postId, "opinion-upserted", {
+    opinion: {
+      id: opinion.id,
+      userId: opinion.userId,
+      selectedOptionId: opinion.selectedOptionId,
+      selectedNone: opinion.selectedNone,
+      comment: opinion.comment,
+      updatedAt: opinion.updatedAt,
+      authorHandle: auth.user.handle,
+    },
+    optionCounts,
+  });
+
+  if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { opinion, optionCounts });
   redirect(ctx.res, `/posts/${postId}`);
 }
 
@@ -784,6 +1110,46 @@ async function handleOpinionMutation(ctx: RequestContext, opinionId: string, act
   redirect(ctx.res, `/posts/${opinion.postId}`);
 }
 
+/**
+ * Feature E: the buyer marks (or unmarks) one existing opinion on their own
+ * post as the one that influenced their decision. Deliberately separate
+ * from handleSetOutcome — the brief explicitly says the buyer shouldn't be
+ * forced to record BOUGHT/DID_NOT_BUY/STILL_DECIDING before marking an
+ * influential comment, so this writes directly via setInfluentialOpinion
+ * rather than going through the outcome form at all.
+ */
+async function handleSetInfluentialOpinion(ctx: RequestContext, postId: string, opinionId: string): Promise<void> {
+  const auth = requireAuth(ctx);
+  const post = getPostById(postId);
+  if (!post) throw new HttpError(404, "post not found");
+
+  const body = await parseBody(ctx.req);
+  requireCsrf(ctx.req, body, auth);
+
+  // Only the post owner may set this marker (brief's explicit rule) —
+  // checked server-side regardless of whether the UI even shows the
+  // control to anyone else.
+  if (post.authorId !== auth.user.id) {
+    log(ctx, "authorization.denied", "failure", { targetType: "post", targetId: postId, meta: { attempted: "mark_influential" } });
+    throw new HttpError(403, "only the post's author can mark an influential opinion");
+  }
+
+  const opinion = getOpinionById(opinionId);
+  // The referenced opinion must belong to the same post (brief's explicit
+  // rule) — checked by loading the opinion and comparing its own postId,
+  // not by trusting the URL alone.
+  if (!opinion || opinion.postId !== postId) {
+    throw new HttpError(400, "that opinion does not belong to this post");
+  }
+
+  const unmark = body.fields.action === "unmark";
+  const outcome = setInfluentialOpinion(postId, unmark ? null : opinionId);
+  log(ctx, "outcome.recorded", "success", { targetType: "post", targetId: postId, meta: { influentialOpinionSet: !unmark } });
+  broadcastToPost(postId, "outcome-updated", { outcome });
+  if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { outcome });
+  redirect(ctx.res, `/posts/${postId}`);
+}
+
 async function handleSetOutcome(ctx: RequestContext, postId: string): Promise<void> {
   const auth = requireAuth(ctx);
   const post = getPostById(postId);
@@ -806,7 +1172,19 @@ async function handleSetOutcome(ctx: RequestContext, postId: string): Promise<vo
     return redirect(ctx.res, `/posts/${postId}?kind=error&msg=${encodeURIComponent(validation.errors.join(" "))}`);
   }
 
-  const outcome = upsertOutcome(postId, input.status as any, (input.reflection as string) ?? "");
+  let purchasedOptionId: string | null | undefined = undefined;
+  const rawOptionId = body.fields.purchasedOptionId;
+  if (post.mode === "WHICH_ONE" && typeof rawOptionId === "string" && rawOptionId !== "") {
+    const option = getPurchaseOptionById(rawOptionId);
+    if (!option || option.postId !== postId) {
+      throw new HttpError(400, "that option does not belong to this post");
+    }
+    purchasedOptionId = option.id;
+  } else if (post.mode === "WHICH_ONE" && rawOptionId === "") {
+    purchasedOptionId = null;
+  }
+
+  const outcome = upsertOutcome(postId, input.status as any, (input.reflection as string) ?? "", purchasedOptionId);
   log(ctx, "outcome.recorded", "success", { targetType: "post", targetId: postId, meta: { status: outcome.status } });
   broadcastToPost(postId, "outcome-updated", { outcome });
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { outcome });
@@ -841,7 +1219,11 @@ function handleProfile(ctx: RequestContext, handle: string): void {
   const authoredPosts = listPostsByAuthor(profileUser.id, isOwnProfile).map(toDiscoverItem);
   const opinionsGiven = isOwnProfile
     ? listOpinionsByUser(profileUser.id)
-        .map((opinion) => ({ opinion, post: getPostById(opinion.postId)! }))
+        .map((opinion) => ({
+          opinion,
+          post: getPostById(opinion.postId)!,
+          optionName: opinion.selectedOptionId ? getPurchaseOptionById(opinion.selectedOptionId)?.name ?? null : null,
+        }))
         .filter((o) => o.post)
     : [];
   const purchaseOutcomes = isOwnProfile
@@ -997,6 +1379,30 @@ function requireAdmin(ctx: RequestContext): AuthContext {
     throw new HttpError(403, "admin access required");
   }
   return auth;
+}
+
+/**
+ * Feature D: admin-triggered, idempotent demo-content seeding. Runs the
+ * exact same scripts/seed-demo-content.ts logic the standalone CLI script
+ * uses, in-process, so there is only ever one seeding code path to keep
+ * correct. Re-running this after the demo set is already seeded (same
+ * DEMO_SEED_VERSION) is a documented no-op, not an error, since an admin
+ * might click it more than once.
+ */
+async function handleAdminSeedDemo(ctx: RequestContext): Promise<void> {
+  requireAdmin(ctx);
+  const result = await seedDemoContent();
+  log(ctx, "post.created", "success", {
+    meta: {
+      reason: "demo_seed",
+      alreadySeeded: result.alreadySeeded,
+      usersCreated: result.usersCreated,
+      postsCreated: result.postsCreated,
+      seedVersion: result.seedVersion,
+    },
+  });
+  if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, result);
+  redirect(ctx.res, "/discover/demo");
 }
 
 function handleAdminPage(ctx: RequestContext): void {
