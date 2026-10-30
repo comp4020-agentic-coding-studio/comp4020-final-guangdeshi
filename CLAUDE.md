@@ -237,6 +237,72 @@ development machines have no comparable ceiling. Where feasible, verify
 with a constrained local run (`node --max-old-space-size=<N>`) before
 deploying, the way this incident's fix was actually confirmed.
 
+## 23. A post's mode gates which opinion shape it accepts — enforced server-side, by loading real rows
+
+`posts.post_mode` is `BUY_PASS` or `WHICH_ONE` (`docs/adr/0003-post-modes-
+and-comparison-voting.md`). `src/server.ts`'s opinion-submission handler
+rejects a BUY/PASS-shaped submission on a `WHICH_ONE` post and a
+comparison-shaped submission on a `BUY_PASS` post, in both directions, with
+a 400 — never silently reinterpreted. A comparison opinion's
+`selectedOptionId` is only ever accepted after loading the actual
+`PurchaseOption` row and checking `option.postId === postId`; a fabricated
+id or a real id belonging to a *different* post is rejected the same way.
+If you add a new opinion-shaped mutation, add both directions of this
+rejection test in `spec/comparison.test.ts`.
+
+## 24. Buy/Pass counts and comparison-option counts are computed by separate, guarded queries
+
+`getOpinionCounts` has an explicit `AND stance IS NOT NULL` guard precisely
+because `opinions.stance` is nullable now that comparison opinions share the
+table — a new query against `opinions` that counts by stance without that
+guard will silently include rows where `stance` is NULL alongside the two
+real values, but SQLite's `GROUP BY` simply won't match them, which
+reads as "fine" until you reason it through. Comparison counts go through
+the separate `getOptionCounts`, grouped by `selected_option_id`. Never
+write one query that tries to compute both.
+
+## 25. Context prompts are a reviewed code config; a post's answers are real, optional, per-post data
+
+`src/context-prompts.ts` holds the data-driven, category-keyed prompt
+definitions (`docs/adr/0004-context-prompts-and-demo-provenance.md`) — treat
+changes to it like a schema change (reviewed, versioned via
+`CONTEXT_SCHEMA_VERSION` if a key's *meaning* changes, not just its
+wording). A post's actual answers only ever produce a `post_context` row
+when at least one prompt was answered or free text was given — never insert
+a row of all-empty answers "just in case." `contextCard()` in
+`src/render.ts` already only renders prompts with a non-empty answer; the
+real backstop is that an unanswered post has no row to render from at all.
+
+## 26. Demo content is real rows with `is_demo = 1` — never a parallel system, never mixed into real aggregates
+
+A demo post/user is created through the exact same `createPost`/
+`createDemoUser`/`upsertOpinion` functions real content uses
+(`scripts/seed-demo-content.ts`), with `isDemo: true` passed through —
+never a separate demo-only code path, so a demo post is guaranteed to
+behave like a real one structurally. Every feed, search, or aggregate-stat
+query that should reflect only real activity needs an explicit `is_demo =
+0` guard (see `listFeed`, `listMostDiscussed`, `activityStats`'s intended
+use) — a new query over `posts` or `users` that omits this guard will
+silently count fictional demo content as real community activity. The
+dedicated `/discover/demo` route is the only place `is_demo = 1` content is
+deliberately shown, always behind the persistent "Demo scenario —
+AI-generated fictional content" banner, never a dismissible tag.
+
+## 27. The influential-opinion marker is owner-set, same-post-scoped, and never changes a vote count
+
+`post_outcomes.influential_opinion_id` can only be set by the post's own
+author (checked server-side, same pattern as every other ownership check in
+this file), and only to an opinion that actually belongs to that same post
+— checked by loading the real `Opinion` row and comparing its `postId`,
+never trusted from the URL. It uses `ON DELETE SET NULL`, not this schema's
+usual `ON DELETE CASCADE`, specifically so deleting the marked opinion
+leaves the outcome row intact with the marker cleared, rather than either
+cascading away the whole outcome or blocking the delete with a foreign-key
+violation — verified directly with a `node:sqlite` script before relying on
+it (see ADR 0003's migration notes). Marking is independent of recording a
+purchase outcome (it can be set before any outcome row exists at all) and
+must never be folded into vote-count queries.
+
 ---
 
 ## Current project state
@@ -244,17 +310,23 @@ deploying, the way this incident's fix was actually confirmed.
 ```
 PRODUCT:   Buy or Pass — a social shopping-opinion platform. A user posts a
            purchase they're considering; other logged-in users give an
-           explicit 👍 Buy / 👎 Pass with a short comment; the author decides
+           explicit 👍 Buy / 👎 Pass with a short comment (or, since v2.0,
+           pick one of 2-4 compared options); the author decides
            independently and can later record Bought/Didn't Buy/Still
-           Deciding. Migrated from an isolated, fully-verified prototype —
-           see docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md.
+           Deciding, optionally marking which opinion influenced them.
+           Migrated from an isolated, fully-verified prototype — see
+           docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md.
 STACK:     TypeScript on Node 24 (type-stripping, no build step), node:sqlite
-           for persistence, Server-Sent Events for real-time sync, plus two
-           small npm dependencies (sharp, busboy) for verified image upload
-           handling. Rationale in PROCESS.md.
-STAGE:     Final Project / Crit 10 — "Fly by instruments." Server-side
-           authorization, structured activity logging, a protected
-           observability page, and the two-person realtime rehearsal are in
-           place; see reflections/crit-10.md and
-           docs/architecture/C10_REHEARSAL.md.
+           for persistence (including FTS5 full-text search), Server-Sent
+           Events for real-time sync, plus two small npm dependencies
+           (sharp, busboy) for verified image upload handling. Rationale in
+           PROCESS.md.
+STAGE:     Buy or Pass v2.0 — a response to tutor feedback that the original
+           single-product Buy/Pass concept was underdeveloped. Adds adaptive
+           per-category purchasing context, a "Which One?" comparison mode,
+           transparent keyword-based historical-decision search, labelled
+           demo content for an otherwise-empty community, and an optional
+           "influenced my decision" marker — see docs/adr/0003 and 0004 and
+           PROCESS.md for the full record. Developed on
+           feature/buy-or-pass-v2; not yet deployed to the live Fly app.
 ```
