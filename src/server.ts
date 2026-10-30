@@ -302,14 +302,29 @@ function toDiscoverItem(post: ReturnType<typeof getPostById>): DiscoverFeedItem 
   const category = getCategoryById(p.categoryId)!;
   const counts = getOpinionCounts(p.id);
   const imageIds = getPostImageIds(p.id);
+  // A WHICH_ONE post has no post_images of its own (its photos live on each
+  // purchase_option instead) and never accumulates Buy/Pass counts (a
+  // comparison selection is never a stance) — so its card needs its own
+  // cover image (the first option's, in display order) and its own opinion
+  // total, rather than always rendering as an imageless, "No opinions yet"
+  // card regardless of how much real community activity it actually has.
+  let coverImageId: string | null = imageIds[0] ?? null;
+  let comparisonOpinionCount: number | undefined;
+  if (p.mode === "WHICH_ONE") {
+    const options = getPurchaseOptionsForPost(p.id);
+    coverImageId = options.find((o) => o.imageId)?.imageId ?? null;
+    const optionCounts = getOptionCounts(p.id);
+    comparisonOpinionCount = Object.values(optionCounts.counts).reduce((a, b) => a + b, 0) + optionCounts.noneCount;
+  }
   return {
     post: p,
-    coverImageId: imageIds[0] ?? null,
+    coverImageId,
     authorHandle: author.handle,
     authorDisplayName: author.displayName,
     categoryName: category.name,
     buyCount: counts.buy,
     passCount: counts.pass,
+    comparisonOpinionCount,
   };
 }
 

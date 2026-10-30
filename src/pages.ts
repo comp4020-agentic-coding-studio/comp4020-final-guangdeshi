@@ -126,6 +126,12 @@ export interface DiscoverFeedItem {
   categoryName: string;
   buyCount: number;
   passCount: number;
+  // WHICH_ONE posts only: total opinions across all options plus "none of
+  // these", since a card can't show a single Buy/Pass bar for a comparison
+  // post — buyCount/passCount are always 0 for these posts (comparison
+  // selections never count as a stance; see getOpinionCounts's own
+  // "AND stance IS NOT NULL" guard).
+  comparisonOpinionCount?: number;
 }
 
 export function discoverPage(

@@ -1516,6 +1516,22 @@ textarea {
   background: var(--color-brand);
   color: white;
 }
+.post-card-tag.comparison-tag {
+  position: absolute;
+  bottom: 0.6rem;
+  right: 0.6rem;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+}
+.stat-comparison-count {
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
 .demo-feed-header p {
   max-width: 640px;
 }

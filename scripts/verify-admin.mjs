@@ -117,6 +117,64 @@ async function main() {
     process.exitCode = 1;
   }
 
+  // ---- v2.0 Feature D: admin-triggered demo-content seeding ----
+  const reporterSeedAttempt = await pageReporter.evaluate(async (url) => {
+    const res = await fetch(url, { method: "POST" });
+    return res.status;
+  }, `${BASE}/admin/demo/seed`);
+  log(`non-admin POST /admin/demo/seed got status: ${reporterSeedAttempt}`);
+  if (reporterSeedAttempt !== 403) {
+    console.error("FAIL: non-admin was not denied /admin/demo/seed with 403");
+    process.exitCode = 1;
+  }
+
+  const seedCsrf = await pageAdmin.evaluate(() => document.getElementById("admin-root")?.dataset.csrf);
+  const seedResult = await pageAdmin.evaluate(
+    async ({ url, csrf }) => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ csrf }),
+      });
+      return { status: res.status, body: await res.json() };
+    },
+    { url: `${BASE}/admin/demo/seed`, csrf: seedCsrf },
+  );
+  log(`admin POST /admin/demo/seed: status ${seedResult.status}, ${JSON.stringify(seedResult.body)}`);
+  if (seedResult.status !== 200) {
+    console.error("FAIL: admin demo seeding did not return 200");
+    process.exitCode = 1;
+  }
+
+  await pageAdmin.goto(`${BASE}/discover/demo`);
+  await pageAdmin.waitForSelector(".post-card-demo", { timeout: 5000 });
+  const demoCardCount = await pageAdmin.locator(".post-card-demo").count();
+  log(`Explore Demo feed shows ${demoCardCount} demo post card(s) after seeding`);
+  if (demoCardCount === 0) {
+    console.error("FAIL: no demo posts visible on /discover/demo after seeding");
+    process.exitCode = 1;
+  }
+  await pageAdmin.screenshot({ path: "screenshots/demo-feed-after-seed.png", fullPage: true });
+
+  // Re-running the seed must be an explicit no-op (idempotent), not a
+  // second batch of duplicate content.
+  const reseedResult = await pageAdmin.evaluate(
+    async ({ url, csrf }) => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ csrf }),
+      });
+      return res.json();
+    },
+    { url: `${BASE}/admin/demo/seed`, csrf: seedCsrf },
+  );
+  log(`re-running the seed: ${JSON.stringify(reseedResult)}`);
+  if (reseedResult.alreadySeeded !== true || reseedResult.postsCreated !== 0) {
+    console.error("FAIL: re-running demo seeding was not a no-op");
+    process.exitCode = 1;
+  }
+
   await browser.close();
   if (process.exitCode !== 1) log("ALL ADMIN CHECKS PASSED");
 }

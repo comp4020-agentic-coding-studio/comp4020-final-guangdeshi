@@ -150,25 +150,45 @@ export function outcomeBadge(status: "BOUGHT" | "DID_NOT_BUY" | "STILL_DECIDING"
 
 export function postCard(
   post: Post,
-  opts: { coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number },
+  opts: {
+    coverImageId: string | null;
+    authorHandle: string;
+    authorDisplayName: string;
+    categoryName: string;
+    buyCount: number;
+    passCount: number;
+    comparisonOpinionCount?: number;
+  },
 ): string {
   const price = formatPrice(post.priceCents, post.currency);
+  const isComparison = post.mode === "WHICH_ONE";
   const total = opts.buyCount + opts.passCount;
   const buyPct = total > 0 ? Math.round((opts.buyCount / total) * 100) : null;
+  // A comparison post never has a Buy/Pass bar to show (its opinions are
+  // option selections, not stances) — its stats line is a single opinion
+  // count instead, matching the detail page's own comparisonCounts summary
+  // rather than always claiming "No opinions yet" regardless of real
+  // activity.
+  const statsLine = isComparison
+    ? opts.comparisonOpinionCount && opts.comparisonOpinionCount > 0
+      ? `<span class="stat-comparison-count">💬 ${opts.comparisonOpinionCount} opinion${opts.comparisonOpinionCount === 1 ? "" : "s"}</span>`
+      : `<span class="stat-empty">No opinions yet</span>`
+    : `<span class="stat-buy">👍 ${opts.buyCount}</span>
+      <span class="stat-pass">👎 ${opts.passCount}</span>
+      ${buyPct !== null ? `<span class="stat-bar"><span class="stat-bar-fill" style="width:${buyPct}%"></span></span>` : `<span class="stat-empty">No opinions yet</span>`}`;
   return `<a href="/posts/${post.id}" class="post-card${post.isDemo ? " post-card-demo" : ""}">
   <div class="post-card-image">
     ${opts.coverImageId ? `<img src="/images/${opts.coverImageId}" alt="" loading="lazy" />` : `<div class="post-card-image-placeholder">🛍️</div>`}
     ${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted</span>` : ""}
     ${post.isDemo ? `<span class="post-card-tag demo-tag-overlay">🤖 Demo</span>` : ""}
+    ${isComparison ? `<span class="post-card-tag comparison-tag">Which One?</span>` : ""}
     <span class="post-card-category">${escapeHtml(opts.categoryName)}</span>
   </div>
   <div class="post-card-body">
     <h3 class="post-card-title">${escapeHtml(post.title)}</h3>
     <p class="post-card-meta">by @${escapeHtml(opts.authorHandle)} · ${timeAgo(post.createdAt)}${price ? ` · <strong>${escapeHtml(price)}</strong>` : ""}</p>
     <div class="post-card-stats">
-      <span class="stat-buy">👍 ${opts.buyCount}</span>
-      <span class="stat-pass">👎 ${opts.passCount}</span>
-      ${buyPct !== null ? `<span class="stat-bar"><span class="stat-bar-fill" style="width:${buyPct}%"></span></span>` : `<span class="stat-empty">No opinions yet</span>`}
+      ${statsLine}
     </div>
   </div>
 </a>`;
