@@ -584,8 +584,14 @@ function parseOptionInputsFromFields(fields: Record<string, any>): Array<{
   sourceUrl: unknown;
   saleNote: unknown;
 }> {
+  // Scans past the UI's own 4-option cap (up to 10) so a direct API call
+  // that sends a 5th+ option is actually counted and rejected by
+  // validatePurchaseOptionCount below, rather than having the extra option
+  // silently dropped by a loop bound that matched the client's own limit —
+  // found via a test asserting that 5 options are rejected, which an i < 4
+  // loop bound made impossible to ever observe.
   const options: ReturnType<typeof parseOptionInputsFromFields> = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 10; i++) {
     const name = fields[`option_name_${i}`];
     if (typeof name !== "string" || name.trim().length === 0) continue;
     options.push({
