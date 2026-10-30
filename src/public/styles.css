@@ -63,6 +63,15 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute's UA-default `display: none` loses to any class
+   that sets its own `display` (e.g. .btn's `display: inline-flex` on
+   #add-option-btn) unless reasserted with higher specificity — found via
+   actual browser verification of the "+ Add option" button failing to hide
+   at the 4-option cap, not by inspection. */
+[hidden] {
+  display: none !important;
+}
+
 html {
   color-scheme: light dark;
 }
@@ -1211,6 +1220,337 @@ textarea {
   margin-bottom: 1.5em;
 }
 
+/* ===========================================================================
+   Buy or Pass v2.0 — Adaptive Context, Which One? comparison mode, demo
+   content, and influential-opinion marker. Additive only: every selector
+   below is new, nothing above this block was restructured, so a BUY_PASS
+   post with no context/options/demo flag renders pixel-identical to before.
+   =========================================================================== */
+
+/* ------------------------------------------------- mode / create-edit form */
+
+.mode-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-bottom: 1.1rem;
+}
+.mode-fieldset legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.4em;
+}
+
+.context-prompts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.context-prompt-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.option-form-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.option-form-block {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.option-form-block legend {
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 0 0.4em;
+}
+.option-form-block .form-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* -------------------------------------------------------- context display */
+
+.context-section {
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.2rem;
+}
+.context-section h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.7em;
+}
+.context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.9rem;
+}
+.context-item {
+  background: var(--color-paper);
+  border-radius: var(--radius-sm);
+  padding: 0.7em 0.9em;
+}
+.context-item-freetext {
+  grid-column: 1 / -1;
+}
+.context-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-ink-faint);
+  margin-bottom: 0.3em;
+}
+.context-value {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+/* --------------------------------------------- comparison mode: voting UI */
+
+.option-select-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.option-select {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.8em 1em;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border-strong);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.option-select input {
+  width: auto;
+  position: absolute;
+  opacity: 0;
+}
+.option-select.selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+.option-select-none {
+  border-style: dashed;
+}
+
+.stance-selected {
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+.stance-none {
+  background: var(--color-border);
+  color: var(--color-ink-muted);
+}
+
+.outcome-option-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.outcome-purchased {
+  font-weight: 600;
+}
+
+/* ------------------------------------------- comparison mode: the grid ---
+   Desktop: a real side-by-side CSS Grid, 2-4 cards, each option's photo
+   given strong visual weight. Mobile (see the responsive block below):
+   a horizontally swipeable scroll-snap track instead of a long vertical
+   stack, per the explicitly approved comparison-UI scope. */
+
+.comparison-section {
+  grid-column: 1 / -1;
+  margin: 1rem 0 1.5rem;
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.2rem;
+}
+.post-detail-comparison .post-detail-grid {
+  grid-template-columns: 1fr;
+}
+.post-detail-comparison .post-detail-media {
+  display: none;
+}
+.purchase-option-card {
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 1rem;
+  border: 2px solid transparent;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.purchase-option-selected {
+  border-color: var(--color-brand);
+}
+.purchase-option-image,
+.purchase-option-image-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--color-border);
+}
+.purchase-option-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+}
+.purchase-option-name {
+  font-size: 1.02rem;
+  margin: 0.3em 0 0;
+}
+.purchase-option-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+.purchase-option-original-price {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-ink-faint);
+  text-decoration: line-through;
+}
+.purchase-option-sale-note {
+  color: var(--color-brand-dark);
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin: 0;
+}
+.purchase-option-condition,
+.purchase-option-source {
+  font-size: 0.82rem;
+  color: var(--color-ink-muted);
+  margin: 0;
+}
+.purchase-option-specs {
+  margin: 0.3em 0 0;
+  padding-left: 1.1em;
+  font-size: 0.82rem;
+  color: var(--color-ink-muted);
+}
+.purchase-option-vote-count {
+  margin: 0.4em 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+.comparison-none-count {
+  margin-top: 0.8rem;
+}
+
+/* ---------------------------------------------- influenced-my-decision ---*/
+
+.influential-mark-form {
+  margin-top: 0.5em;
+}
+.btn-tiny {
+  padding: 0.3em 0.7em;
+  font-size: 0.74rem;
+}
+.influential-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-brand-dark);
+  background: var(--color-brand-light);
+  padding: 0.2em 0.6em;
+  border-radius: 999px;
+}
+.opinion-item-influential {
+  border: 2px solid var(--color-brand);
+}
+
+/* ----------------------------------------------------------- demo content */
+
+.demo-banner {
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.7em 1em;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.2rem;
+}
+.demo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-brand-dark);
+  background: var(--color-brand-light);
+  padding: 0.25em 0.7em;
+  border-radius: 999px;
+  margin-bottom: 0.5em;
+}
+.post-card-tag.demo-tag-overlay {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  left: auto;
+  background: var(--color-brand);
+  color: white;
+}
+.demo-feed-header p {
+  max-width: 640px;
+}
+
+/* ------------------------------------------------------ related decisions */
+
+.related-section {
+  grid-column: 1 / -1;
+  margin-top: 2rem;
+}
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.related-decision-card {
+  display: block;
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  padding: 0.9rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.related-decision-card h4 {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0 0 0.3em;
+}
+.related-decision-card p {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
 /* ------------------------------------------------------------ responsive */
 
 @media (max-width: 900px) {
@@ -1279,5 +1619,30 @@ textarea {
   .admin-log-row span:nth-child(5),
   .admin-log-row span:nth-child(7) {
     display: none;
+  }
+
+  /* Comparison mode on a phone: horizontally swipeable scroll-snap cards
+     instead of a long vertical stack of 2-4 full-width cards, per the
+     approved comparison-UI scope ("avoid a very long vertical list of four
+     products... clear navigation indicators"). Each card locks edge-to-edge
+     as the user swipes; a thin dot row beneath (rendered by nothing more
+     than CSS scroll-snap's natural stop points) isn't added as extra DOM —
+     the cards' own partial-peek of the next card is the navigation cue. */
+  .comparison-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .purchase-option-card {
+    scroll-snap-align: start;
+    flex: 0 0 82%;
+  }
+  .related-grid {
+    grid-template-columns: 1fr;
   }
 }

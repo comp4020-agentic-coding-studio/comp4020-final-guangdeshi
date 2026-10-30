@@ -531,17 +531,16 @@ export function createEditPostPage(
   <p class="muted">Keep it quick — a title, a photo or two, and why you're considering it.</p>
   ${flashBanner(error)}
 
-  ${!isEdit
-    ? `<fieldset class="mode-fieldset">
-        <legend>What kind of post is this?</legend>
-        <label class="radio-row"><input type="radio" name="mode" value="BUY_PASS" ${postMode === "BUY_PASS" ? "checked" : ""} /> Buy or Pass — one product, a simple 👍/👎</label>
-        <label class="radio-row"><input type="radio" name="mode" value="WHICH_ONE" ${postMode === "WHICH_ONE" ? "checked" : ""} /> Which One? — compare 2-4 candidate products</label>
-      </fieldset>`
-    : `<input type="hidden" name="mode" value="${postMode}" />`}
-
   <form method="post" action="${action}" enctype="multipart/form-data" class="form-stack post-form" data-post-mode="${postMode}">
     <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
-    ${isEdit ? `<input type="hidden" name="mode" value="${postMode}" />` : ""}
+
+    ${!isEdit
+      ? `<fieldset class="mode-fieldset">
+          <legend>What kind of post is this?</legend>
+          <label class="radio-row"><input type="radio" name="mode" value="BUY_PASS" ${postMode === "BUY_PASS" ? "checked" : ""} /> Buy or Pass — one product, a simple 👍/👎</label>
+          <label class="radio-row"><input type="radio" name="mode" value="WHICH_ONE" ${postMode === "WHICH_ONE" ? "checked" : ""} /> Which One? — compare 2-4 candidate products</label>
+        </fieldset>`
+      : `<input type="hidden" name="mode" value="${postMode}" />`}
 
     <label>${postMode === "WHICH_ONE" ? "Purchasing question" : "Product title"}
       <input type="text" name="title" required maxlength="120" value="${escapeHtml(post?.title ?? "")}" placeholder="${postMode === "WHICH_ONE" ? "e.g. Which sleeping bag for a cold NZ hike?" : "e.g. Mac mini M4 Pro for local AI dev"}" />

@@ -22,6 +22,17 @@ export class MultipartError extends Error {}
 
 const MAX_FILES = 4;
 const MAX_FIELD_SIZE = 10 * 1024; // text fields are short (title, tags, etc.)
+// The create/edit post form always renders every category's context-prompt
+// block (up to 3 fields each, across ~10 categories) plus up to 4 comparison
+// option blocks (8 fields each) in the DOM — client-side JS shows only the
+// relevant ones, but the browser submits every field in the form regardless
+// of visibility. The pre-v2 limit of 30 silently dropped fields past that
+// count (including `mode` itself), which only surfaced as a wrong-mode
+// post getting created — found via an actual end-to-end browser submission,
+// not by inspection. 200 leaves comfortable headroom over the ~90-field
+// worst case (10 categories x 3 + free_text + 4 options x 8 + core fields)
+// without opening the door to a genuinely abusive field count.
+const MAX_FIELDS = 200;
 
 export function parseMultipart(req: IncomingMessage): Promise<ParsedMultipart> {
   return new Promise((resolve, reject) => {
@@ -32,7 +43,7 @@ export function parseMultipart(req: IncomingMessage): Promise<ParsedMultipart> {
         limits: {
           fileSize: MAX_UPLOAD_BYTES,
           files: MAX_FILES,
-          fields: 30,
+          fields: MAX_FIELDS,
           fieldSize: MAX_FIELD_SIZE,
         },
       });
