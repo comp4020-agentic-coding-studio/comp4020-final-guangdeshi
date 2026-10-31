@@ -145,6 +145,28 @@ img {
   display: block;
 }
 
+/* A consistent, deliberately visible focus ring for every interactive
+   element reached via Tab — found missing during the visual-audit's
+   accessibility pass: links and .btn elements were relying on the
+   browser's own default outline (1px, barely visible against the dark
+   --color-brand button fill) rather than a ring this design system
+   actually chose. :focus-visible (not :focus) so a mouse click never shows
+   the ring, only real keyboard navigation does. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.btn:focus-visible {
+  outline-offset: 3px;
+}
+
 .muted {
   color: var(--color-ink-muted);
 }
