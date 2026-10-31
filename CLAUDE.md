@@ -284,8 +284,10 @@ query that should reflect only real activity needs an explicit `is_demo =
 0` guard (see `listFeed`, `listMostDiscussed`, `activityStats`'s intended
 use) — a new query over `posts` or `users` that omits this guard will
 silently count fictional demo content as real community activity. The
-dedicated `/discover/demo` route is the only place `is_demo = 1` content is
-deliberately shown, always behind the persistent "Demo scenario —
+`/showcase` archive (legacy `/discover/demo` and `?source=demo` redirect
+there) is the only listing where `is_demo = 1` content is deliberately shown;
+Discover's Products and Questions views never show it. A demo post's own page
+is always shown behind the persistent "Demo scenario —
 AI-generated fictional content" banner, never a dismissible tag.
 
 ## 27. The influential-opinion marker is owner-set, same-post-scoped, and never changes a vote count
@@ -302,6 +304,18 @@ violation — verified directly with a `node:sqlite` script before relying on
 it (see ADR 0003's migration notes). Marking is independent of recording a
 purchase outcome (it can be set before any outcome row exists at all) and
 must never be folded into vote-count queries.
+
+## 28. Catalog products are facts, never engagement or prices
+
+`src/catalog.ts` (migration 0008) holds real product records imported from a
+licensed dataset (`docs/research/PRODUCT_CATALOG_PROVENANCE.md`). A catalog
+product must never carry a price, rating, review, stock status, discount or
+popularity score. The buyer supplies their own price on their own post. The
+only engagement shown for a product is a live `COUNT` of real public active
+non-demo posts linking to it (`countQuestionsForProduct`). The catalog sync
+is an idempotent upsert that never deletes a product (a real post may link to
+it) and never touches user tables. Every product photo keeps its source image
+id and URL and is credited on its product page and at `/credits`.
 
 ---
 

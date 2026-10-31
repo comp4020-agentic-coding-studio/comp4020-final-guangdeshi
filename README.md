@@ -30,10 +30,13 @@ Anyone weighing a non-trivial purchase who wants advice that accounts for
 *their* situation, not a generic star rating: a hiker deciding between
 three sleeping bags for a specific cold-weather trip, a student picking a
 laptop within a specific budget, or anyone wondering whether a "premium"
-option is actually overspecified for what they'll really use it for. Where
-a product has 18 fictional but realistic demo scenarios
-(`/discover/demo`), anyone can see what the community looks like in action
-before a single real post exists.
+option is actually overspecified for what they'll really use it for.
+Discover starts from a curated catalog of 72 real products with real photos
+(Amazon Berkeley Objects, CC BY 4.0; see `/credits` and
+`docs/research/PRODUCT_CATALOG_PROVENANCE.md`): pick one, add your own price
+and situation, and ask. The catalog never supplies prices, ratings or
+reviews. The 18 fictional demo scenarios from earlier development are kept,
+clearly labelled, in the `/showcase` archive, not in Discover.
 
 ## Definition of good
 
