@@ -6,17 +6,45 @@
 import { describe, expect, it } from "vitest";
 import { apiCall, baseUrl, createPost, registerUser } from "./helpers.ts";
 
+// searchPosts() (src/db.ts) tokenizes a title into an OR of every one of
+// its words, so ANY word repeated verbatim across test runs — whether a
+// common English word ("Mechanical keyboard...") or a fixed nonsense word
+// ("Zigvorn plintheth...") — accumulates duplicate matching posts in a
+// long-lived, never-reset database, each prior run's pair becoming a
+// plausible competing match for the current run's own pair under
+// searchPosts's bounded `limit: 4` window (src/server.ts's
+// handlePostDetail). Found via a design-audit stability check (running the
+// full suite repeatedly without resetting the database) and fixed twice
+// before landing on the actually-sufficient version: appending a unique
+// run id to otherwise-fixed words only reduces the collision rate (the
+// *other* words are still fixed and still accumulate); using fixed
+// nonsense words instead of common English words changes nothing, since
+// searchPosts treats every word identically regardless of whether it's a
+// real word. The only fix that is correct independent of how many times
+// this suite has been run against the same database is generating the
+// ENTIRE title fresh each run, so no word in it — not just one token - can
+// ever repeat across runs.
+function randomWord(): string {
+  return Math.random().toString(36).slice(2, 2 + 6 + Math.floor(Math.random() * 4));
+}
+function freshTitle(wordCount: number): string {
+  return Array.from({ length: wordCount }, randomWord).join(" ");
+}
+
 describe("historical decision search", () => {
   it("surfaces a public post as a related decision for another post sharing distinctive title words", async () => {
     const alice = await registerUser();
     const bob = await registerUser();
-    await createPost(alice, { title: "Mechanical keyboard for office typing XQZ" });
-    const postId = await createPost(bob, { title: "Another mechanical keyboard question XQZ" });
+    const sharedWord = randomWord();
+    const titleA = `${randomWord()} ${sharedWord} ${randomWord()}`;
+    const titleB = `${randomWord()} ${sharedWord} ${randomWord()} ${randomWord()}`;
+    await createPost(alice, { title: titleA });
+    const postId = await createPost(bob, { title: titleB });
 
     const res = await fetch(new URL(`/posts/${postId}`, baseUrl()));
     const html = await res.text();
     expect(html).toContain("Related decisions");
-    expect(html).toContain("Mechanical keyboard for office typing XQZ");
+    expect(html).toContain(titleA);
   });
 
   it("finds posts via the Discover search box using the same keyword match", async () => {

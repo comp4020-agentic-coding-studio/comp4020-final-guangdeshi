@@ -64,6 +64,18 @@ ${renderFooter()}
 </html>`;
 }
 
+/**
+ * Nav markup is rendered once and shown two ways via CSS alone (no server
+ * branching needed): at desktop widths the normal inline .main-nav/.nav-
+ * right row is visible and .nav-toggle/.mobile-nav-panel stay display:none;
+ * under the mobile breakpoint the inline row hides and the same links
+ * reappear inside .mobile-nav-panel, toggled open/closed by .nav-toggle
+ * (app.js's initMobileNav). This was the fix for a real bug found during
+ * the design audit: the authenticated header (Discover, My activity,
+ * +New post, avatar, Log out all competing for one row) measured 465px
+ * wide against a 390px viewport, causing page-wide horizontal scroll that
+ * the anonymous-only automated overflow check never caught.
+ */
 function renderNav(active: string | undefined, viewer: ViewerContext): string {
   const navLink = (href: string, key: string, label: string) =>
     `<a href="${href}" class="nav-link${active === key ? " active" : ""}">${label}</a>`;
@@ -71,6 +83,10 @@ function renderNav(active: string | undefined, viewer: ViewerContext): string {
   const navAvatar = viewer.user?.avatarImageId
     ? `<img src="/images/${viewer.user.avatarImageId}" alt="" class="nav-avatar nav-avatar-photo" />`
     : avatarInitial(viewer.user?.displayName ?? "?");
+
+  const navLinks = `${navLink("/discover", "discover", "Discover")}
+      ${viewer.user ? navLink("/me/activity", "activity", "My activity") : ""}
+      ${viewer.user?.isAdmin ? navLink("/admin", "admin", "Observability") : ""}`;
 
   const rightSide = viewer.user
     ? `<a href="/posts/new" class="btn btn-brand btn-small">+ New post</a>
@@ -85,12 +101,21 @@ function renderNav(active: string | undefined, viewer: ViewerContext): string {
   return `<header class="site-header">
   <div class="site-header-inner">
     <a href="/" class="wordmark">Buy<span class="wordmark-or">or</span>Pass</a>
-    <nav class="main-nav">
-      ${navLink("/discover", "discover", "Discover")}
-      ${viewer.user ? navLink("/me/activity", "activity", "My activity") : ""}
-      ${viewer.user?.isAdmin ? navLink("/admin", "admin", "Observability") : ""}
+    <nav class="main-nav" aria-label="Primary">
+      ${navLinks}
     </nav>
     <div class="nav-right">${rightSide}</div>
+    <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="mobile-nav-panel" aria-label="Open menu">
+      <span class="nav-toggle-bar"></span>
+      <span class="nav-toggle-bar"></span>
+      <span class="nav-toggle-bar"></span>
+    </button>
+  </div>
+  <div class="mobile-nav-panel" id="mobile-nav-panel" hidden>
+    <nav class="mobile-nav-links" aria-label="Primary">
+      ${navLinks}
+    </nav>
+    <div class="mobile-nav-actions">${rightSide}</div>
   </div>
 </header>`;
 }

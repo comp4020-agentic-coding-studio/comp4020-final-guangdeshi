@@ -70,20 +70,66 @@ const CC_BY_ATTRIBUTION: Partial<Record<Exclude<ImageKey, null>, string>> = {
   macmini: "Photo by Seasider53, Wikimedia Commons, CC BY 4.0.",
 };
 
+// Greedy word-wrap, estimating each character's rendered width rather than
+// assuming a fixed-width font — SVG <text> has no automatic wrapping, and
+// the earlier version of this function (passing only an arbitrary 3-word
+// slice of the real title) produced illustrations whose labels read as
+// truncated mid-sentence fragments ("Mechanical keyboard —", "Electric bike
+// for") once a real scenario title didn't fit, found and fixed during the
+// visual design audit. This wraps the *actual* label at however many lines
+// it needs, so nothing is ever cut off.
+function wrapLabel(label: string, maxCharsPerLine: number, maxLines: number): string[] {
+  const words = label.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxCharsPerLine && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+    if (lines.length === maxLines - 1) break;
+  }
+  if (current) lines.push(current);
+  // If words remain unconsumed (label longer than maxLines allows), the
+  // last line gets an ellipsis rather than silently dropping the overflow
+  // without any indication text was cut — this only triggers for labels
+  // longer than ~maxLines*maxCharsPerLine characters, well beyond any real
+  // scenario title or option name in src/demo-scenarios.ts.
+  const consumed = lines.join(" ").length;
+  if (consumed < label.length) {
+    lines[lines.length - 1] = `${lines[lines.length - 1].replace(/[,.;:\s]+$/, "")}…`;
+  }
+  return lines;
+}
+
 // A simple, original, locally-generated illustration for any demo item with
-// no sourced real photo — flat background + centered label, composited with
-// sharp (no external asset, no generation API). Deliberately plain: this is
-// a fallback for provenance safety, not an attempt to look like a stock
+// no sourced real photo — flat background + centered, word-wrapped label,
+// composited with sharp (no external asset, no generation API). Font size
+// scales down for longer labels so a full post title (not just a 3-word
+// fragment) always fits within the frame. Deliberately plain: this is a
+// fallback for provenance safety, not an attempt to look like a stock
 // photo.
 async function generateIllustration(label: string, seedColor: string): Promise<Buffer> {
   const width = 960;
   const height = 720;
+  const fontSize = label.length > 45 ? 34 : label.length > 25 ? 40 : 48;
+  const maxCharsPerLine = Math.round((width - 160) / (fontSize * 0.54));
+  const lines = wrapLabel(label, maxCharsPerLine, 4);
+  const lineHeight = fontSize * 1.25;
+  const blockHeight = lines.length * lineHeight;
+  const startY = height / 2 - blockHeight / 2 - 20;
+  const tspans = lines
+    .map((line, i) => `<tspan x="50%" dy="${i === 0 ? 0 : lineHeight}">${escapeXml(line)}</tspan>`)
+    .join("");
   const svg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <rect width="100%" height="100%" fill="${seedColor}" />
       <rect x="40" y="40" width="${width - 80}" height="${height - 80}" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.35" rx="18" />
-      <text x="50%" y="48%" font-family="Georgia, 'Times New Roman', serif" font-size="48" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${escapeXml(label)}</text>
-      <text x="50%" y="60%" font-family="Georgia, 'Times New Roman', serif" font-size="22" fill="#ffffff" opacity="0.8" text-anchor="middle" dominant-baseline="middle">Demo scenario illustration</text>
+      <text x="50%" y="${startY}" font-family="Georgia, 'Times New Roman', serif" font-size="${fontSize}" fill="#ffffff" text-anchor="middle">${tspans}</text>
+      <text x="50%" y="${startY + blockHeight + 36}" font-family="Georgia, 'Times New Roman', serif" font-size="20" fill="#ffffff" opacity="0.8" text-anchor="middle">Demo scenario illustration</text>
     </svg>
   `;
   return sharp(Buffer.from(svg)).jpeg({ quality: 85 }).toBuffer();
@@ -184,7 +230,7 @@ export async function seedDemoContent(): Promise<SeedResult> {
     if (scenario.mode === "BUY_PASS") {
       const imageId = scenario.imageKey
         ? await storeRealImage(authorId, scenario.imageKey)
-        : await storeIllustration(authorId, scenario.title.split(" ").slice(0, 3).join(" "), scenario.categoryId);
+        : await storeIllustration(authorId, scenario.title, scenario.categoryId);
       const post = createPost(
         {
           authorId,
@@ -228,7 +274,7 @@ export async function seedDemoContent(): Promise<SeedResult> {
     for (const opt of scenario.options ?? []) {
       const imageId = opt.imageKey
         ? await storeRealImage(authorId, opt.imageKey)
-        : await storeIllustration(authorId, opt.name.split(" ").slice(0, 3).join(" "), scenario.categoryId);
+        : await storeIllustration(authorId, opt.name, scenario.categoryId);
       options.push({
         name: opt.name,
         imageId,

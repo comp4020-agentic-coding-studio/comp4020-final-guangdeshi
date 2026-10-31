@@ -395,8 +395,45 @@ function initPostForm() {
   });
 }
 
+/**
+ * Mobile hamburger menu: a real <button> (keyboard/Enter/Space work for
+ * free) toggling aria-expanded and the panel's `hidden` attribute together,
+ * so assistive tech and CSS agree on open/closed state from one source of
+ * truth rather than a separate class. Closes on Escape and on resizing back
+ * past the desktop breakpoint, so a panel left open on mobile doesn't carry
+ * into a resized/rotated desktop view where the inline nav is visible again.
+ */
+function initMobileNav() {
+  const toggle = document.querySelector(".nav-toggle");
+  const panel = document.getElementById("mobile-nav-panel");
+  if (!toggle || !panel) return;
+
+  function setOpen(open) {
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    panel.hidden = !open;
+  }
+
+  toggle.addEventListener("click", () => {
+    setOpen(toggle.getAttribute("aria-expanded") !== "true");
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") {
+      setOpen(false);
+      toggle.focus();
+    }
+  });
+
+  const desktopQuery = window.matchMedia("(min-width: 641px)");
+  desktopQuery.addEventListener("change", (event) => {
+    if (event.matches) setOpen(false);
+  });
+}
+
 initPostDetail();
 initAdmin();
 initGallery();
 initCurrencyUppercase();
+initMobileNav();
 initPostForm();

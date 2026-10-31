@@ -248,6 +248,44 @@ img {
   object-fit: cover;
 }
 
+/* Hamburger toggle: hidden entirely above the mobile breakpoint, where the
+   inline .main-nav/.nav-right row has room. A real <button>, not a <div
+   onclick>, so it's keyboard-reachable and gets a focus ring for free. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nav-toggle-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--color-ink);
+  border-radius: 1px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(2) {
+  opacity: 0;
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.mobile-nav-panel {
+  display: none;
+}
+
 /* --------------------------------------------------------------- footer */
 
 .site-footer {
@@ -1590,16 +1628,59 @@ textarea {
   .wordmark {
     font-size: 1.15rem;
   }
-  .main-nav {
-    gap: 0.8rem;
-    font-size: 0.85rem;
-  }
+  /* The inline nav row (.main-nav + .nav-right) is what overflowed a 390px
+     viewport once logged in — Discover, My activity, +New post, the
+     avatar, and Log out all competing for one row with no way to shrink.
+     Below this breakpoint that row is replaced by a single hamburger
+     button opening .mobile-nav-panel as a full-width dropdown, so no
+     element is ever forced to compete for horizontal space. */
+  .main-nav,
   .nav-right {
+    display: none;
+  }
+  .nav-toggle {
+    display: flex;
+  }
+  .mobile-nav-panel:not([hidden]) {
+    display: block;
+    border-top: 1px solid var(--color-border);
+    padding: 1rem;
+    background: var(--color-paper);
+  }
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin-bottom: 1.1rem;
+  }
+  .mobile-nav-links .nav-link {
+    font-size: 1.05rem;
+  }
+  .mobile-nav-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+  .mobile-nav-actions .nav-avatar-link {
+    display: flex;
+    align-items: center;
     gap: 0.6rem;
   }
-  .nav-right .btn-small {
-    padding: 0.5em 0.8em;
-    font-size: 0.8rem;
+  .mobile-nav-actions .nav-avatar-link::after {
+    content: "View profile";
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+  .mobile-nav-actions form.inline-form {
+    display: block;
+  }
+  .mobile-nav-actions .as-button {
+    width: 100%;
+    text-align: left;
+    font-size: 1.05rem;
+    padding: 0.4em 0;
   }
   .hero {
     padding: 2.5rem 1rem 2rem;

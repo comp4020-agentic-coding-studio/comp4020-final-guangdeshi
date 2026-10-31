@@ -1,32 +1,19 @@
 // Discover feed: category browsing, search, and "most discussed" sort
-// (brief's "popular or actively discussed posts" requirement).
+// (brief's "popular or actively discussed posts" requirement). The ordering
+// test itself — asserting exactly where two specific posts land within
+// listMostDiscussed's bounded top-20 window — moved to
+// spec/discover-sorting.test.ts, which runs against its own private,
+// isolated database rather than the one every file in this suite shares,
+// after being found flaky under cross-file interleaving (see that file's
+// header comment for the full root-cause account). The test below is safe
+// to keep here: it only asserts an unlisted post's absence from the
+// results, which holds regardless of how many other posts exist or where
+// the top-20 boundary falls, since visibility filtering is a WHERE clause,
+// not a LIMIT.
 import { describe, expect, it } from "vitest";
 import { baseUrl, createPost, registerUser, submitOpinion } from "./helpers.ts";
 
 describe("discover: most discussed sort", () => {
-  it("orders posts by total opinion count, most first", async () => {
-    const author = await registerUser();
-    const voter1 = await registerUser();
-    const voter2 = await registerUser();
-    const voter3 = await registerUser();
-
-    const quietPostId = await createPost(author, { title: "Quiet post with zero opinions XYZ" });
-    const popularPostId = await createPost(author, { title: "Popular post with three opinions XYZ" });
-
-    await submitOpinion(voter1, popularPostId, "BUY", "Opinion one");
-    await submitOpinion(voter2, popularPostId, "PASS", "Opinion two");
-    await submitOpinion(voter3, popularPostId, "BUY", "Opinion three");
-
-    const res = await fetch(new URL("/discover?sort=discussed", baseUrl()));
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    const popularIndex = html.indexOf("Popular post with three opinions XYZ");
-    const quietIndex = html.indexOf("Quiet post with zero opinions XYZ");
-    expect(popularIndex).toBeGreaterThan(-1);
-    expect(quietIndex).toBeGreaterThan(-1);
-    expect(popularIndex).toBeLessThan(quietIndex);
-  });
-
   it("excludes unlisted posts from most-discussed, same as the recent feed", async () => {
     const author = await registerUser();
     const voter = await registerUser();
