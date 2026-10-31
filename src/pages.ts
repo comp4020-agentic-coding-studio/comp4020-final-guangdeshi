@@ -24,38 +24,60 @@ import {
 
 // --------------------------------------------------------------- landing --
 
-export function landingPage(viewer: ViewerContext, featured: Array<{ post: Post; coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number }>): string {
+export function landingPage(
+  viewer: ViewerContext,
+  featured: Array<{ post: Post; coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number }>,
+  demoPreview: Array<{ post: Post; coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number; comparisonOpinionCount?: number }> = [],
+): string {
+  // Core user journey, made literal in the page's own section order: the
+  // purchasing question comes first (the hero names the actual question
+  // this product answers, not a generic tagline), then how a decision
+  // actually gets made here, then what's happening right now — real posts
+  // if any exist, otherwise an honest "we're new" state that offers the
+  // labelled demo content instead of a bare empty box or a wall of
+  // decoration standing in for substance.
+  const realFeedSection = featured.length > 0
+    ? `<section class="section">
+        <div class="section-header">
+          <h2>Recent purchasing questions</h2>
+          <a href="/discover" class="link-more">See all →</a>
+        </div>
+        <div class="post-grid">${featured.map((f) => postCard(f.post, f)).join("\n")}</div>
+      </section>`
+    : `<section class="section section-new-platform">
+        <div class="new-platform-card">
+          <h2>This community is just getting started</h2>
+          <p>Buy or Pass doesn't have real posts yet — you'd be looking at an empty page if we didn't say so. Here's what it looks like once people are actually using it: ${demoPreview.length} fictional, clearly labelled example decisions below, written to show the format, not to fake activity.</p>
+          <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand btn-large">Post the first real one</a>
+        </div>
+        ${demoPreview.length > 0
+          ? `<div class="post-grid">${demoPreview.map((f) => postCard(f.post, f)).join("\n")}</div>
+             <div class="load-more-row"><a href="/discover/demo" class="link-more">See all demo scenarios →</a></div>`
+          : ""}
+      </section>`;
+
   const body = `
 <section class="hero">
   <div class="hero-inner">
-    <p class="hero-eyebrow">A friendly community for purchase decisions</p>
-    <h1 class="hero-title">You want it.<br/>What does everyone else think?</h1>
-    <p class="hero-sub">Post what you're thinking about buying. Real people give you a quick 👍 Buy or 👎 Pass with a short honest opinion. You still make the call.</p>
+    <h1 class="hero-title">You want it. What does everyone else think?</h1>
+    <p class="hero-sub">Post what you're thinking about buying — with enough context for an honest answer. Real people give you a quick 👍 Buy or 👎 Pass, or help you pick between a few options. You still make the call.</p>
     <div class="hero-actions">
       <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand btn-large">Post something you're eyeing</a>
       <a href="/discover" class="btn btn-ghost btn-large">Explore opinions</a>
     </div>
     <div class="hero-howitworks">
-      <div class="howitworks-step"><span class="step-num">1</span><div><strong>Post it</strong><p>Photos, price, and why you're considering it.</p></div></div>
-      <div class="howitworks-step"><span class="step-num">2</span><div><strong>Get real opinions</strong><p>👍 Buy or 👎 Pass, plus one honest sentence.</p></div></div>
+      <div class="howitworks-step"><span class="step-num">1</span><div><strong>Post it</strong><p>Photos, price, and the context that makes your situation specific.</p></div></div>
+      <div class="howitworks-step"><span class="step-num">2</span><div><strong>Get real opinions</strong><p>👍 Buy or 👎 Pass — or a pick between options — plus one honest sentence.</p></div></div>
       <div class="howitworks-step"><span class="step-num">3</span><div><strong>You decide</strong><p>The purchase is always yours to make.</p></div></div>
     </div>
   </div>
 </section>
 
-<section class="section">
-  <div class="section-header">
-    <h2>Fresh purchasing questions</h2>
-    <a href="/discover" class="link-more">See all →</a>
-  </div>
-  ${featured.length > 0
-    ? `<div class="post-grid">${featured.map((f) => postCard(f.post, f)).join("\n")}</div>`
-    : emptyState({ icon: "🛍️", title: "No posts yet", body: "Be the first to ask the community: buy or pass?", actionHref: viewer.user ? "/posts/new" : "/register", actionLabel: "Create the first post" })}
-</section>
+${realFeedSection}
 
 <section class="section section-definition">
   <div class="definition-card">
-    <h2>Good advice is relevant, honest, and easy to give.</h2>
+    <h2>A good purchasing decision depends on the person, not just the product.</h2>
     <p>The purchase belongs to the buyer. The opinions belong to the community. Every opinion takes an explicit stance, nobody can decide for you, and counts always reflect real votes — never fabricated ones.</p>
     <a href="/readme/" class="link-more">Read our full Definition of Good →</a>
   </div>
@@ -375,9 +397,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       </section>`
     : "";
 
-  const summarySection = isComparison
-    ? comparisonGrid
-    : `<div class="opinion-summary" id="opinion-summary">
+  const buyPassSummary = `<div class="opinion-summary" id="opinion-summary">
         <div class="opinion-counts">
           <span class="count-buy" id="count-buy">👍 ${buyCount} Buy</span>
           <span class="count-pass" id="count-pass">👎 ${passCount} Pass</span>
@@ -385,30 +405,56 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         <div class="stat-bar stat-bar-large"><span class="stat-bar-fill" id="buy-pct-bar" style="width:${buyPct}%"></span></div>
       </div>`;
 
-  const body = `
-<article class="post-detail${isComparison ? " post-detail-comparison" : ""}" data-post-id="${post.id}" data-post-mode="${post.mode}">
-  ${flashBanner(flash.message, flash.kind)}
-  ${demoBanner}
-  <div class="post-detail-grid">
-    <div class="post-detail-media">${gallery}</div>
-    <div class="post-detail-info">
-      ${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted — share link only</span>` : ""}
+  const headerBlock = `${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted — share link only</span>` : ""}
       <span class="post-detail-category">${escapeHtml(category.name)}</span>
       <h1>${escapeHtml(post.title)}</h1>
       <p class="post-detail-meta">by <a href="/u/${encodeURIComponent(author.handle)}">@${escapeHtml(author.handle)}</a> · ${timeAgo(post.createdAt)}</p>
       ${!isComparison && price ? `<p class="post-detail-price">${escapeHtml(price)}</p>` : ""}
       <p class="post-detail-description">${escapeHtml(post.description)}</p>
       ${post.tags.length > 0 ? `<div class="tag-row">${post.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
-      ${ownerControls}
+      ${ownerControls}`;
 
+  // Reading order (approved core-journey redesign): purchasing question →
+  // buyer context → product/options → simple opinion action → community
+  // reasons → historical decisions. BUY_PASS keeps its existing two-column
+  // layout (a real product gallery sits naturally alongside the question);
+  // WHICH_ONE has no single product photo to anchor a media column against
+  // (each option has its own), so the comparison grid itself — the actual
+  // "product" content for this mode — now runs full-width immediately
+  // after context and before the opinion form, instead of the previous
+  // layout which buried it below the vote form entirely (a design-audit
+  // finding: the core comparison content sat below the fold on mobile,
+  // after a demo banner, category, title, description, tags and context
+  // all stacked ahead of it).
+  const mainColumn = isComparison
+    ? `${headerBlock}
+      ${contextSection}`
+    : `${headerBlock}
       ${contextSection}
-      ${!isComparison ? summarySection : ""}
+      ${buyPassSummary}
       ${opinionForm}
-      ${outcomeSection}
+      ${outcomeSection}`;
+
+  const body = `
+<article class="post-detail${isComparison ? " post-detail-comparison" : ""}" data-post-id="${post.id}" data-post-mode="${post.mode}">
+  ${flashBanner(flash.message, flash.kind)}
+  ${demoBanner}
+  <div class="post-detail-grid">
+    ${isComparison ? "" : `<div class="post-detail-media">${gallery}</div>`}
+    <div class="post-detail-info">
+      ${mainColumn}
     </div>
   </div>
 
-  ${isComparison ? `<section class="comparison-section">${summarySection}</section>` : ""}
+  ${isComparison
+    ? `<section class="comparison-section">
+        ${comparisonGrid}
+        <div class="comparison-action">
+          ${opinionForm}
+          ${outcomeSection}
+        </div>
+      </section>`
+    : ""}
 
   <section class="opinions-section">
     <h2>Opinions (<span id="opinion-count">${opinions.length}</span>)</h2>
@@ -455,42 +501,69 @@ export interface CreateEditPostMode {
   existingContext?: PostContext | null;
 }
 
-/** One blank/prefilled option block's HTML, reused for both the N options already on an edited post and the empty template a "+ Add option" click clones. */
+/**
+ * One blank/prefilled option block's HTML, reused for both the N options
+ * already on an edited post and the empty template a "+ Add option" click
+ * clones. Redesigned per the design-audit's "2800px wall of repeated
+ * inputs" finding: every field from the original form is still here and
+ * still has the same name="option_*_N" the server already parses — only
+ * the layout changed. The two fields someone always fills in (photo, name
+ * + price) sit in a compact header row; the five genuinely optional ones
+ * (currency override, original price, condition, sale note, source link)
+ * move into a closed-by-default <details> so a 2-option post reads as two
+ * short cards, not fourteen always-open inputs.
+ */
 function optionFormBlock(index: number, existing?: PurchaseOption): string {
   const priceValue = existing ? (existing.expectedPriceCents / 100).toFixed(2) : "";
   const originalValue = existing?.originalPriceCents != null ? (existing.originalPriceCents / 100).toFixed(2) : "";
   return `<fieldset class="option-form-block" data-option-index="${index}">
-    <legend>Option ${index + 1}</legend>
-    <label>Name
-      <input type="text" name="option_name_${index}" maxlength="80" value="${escapeHtml(existing?.name ?? "")}" placeholder="e.g. Western Mountaineering MegaLite" />
-    </label>
-    <label>Photo (optional)
-      <input type="file" name="option_image_${index}" accept="image/*" />
-    </label>
-    ${existing?.imageId ? `<img src="/images/${existing.imageId}" alt="" class="existing-image-thumb" />` : ""}
-    <div class="form-row">
-      <label>Expected price
-        <input type="number" name="option_price_${index}" min="0" step="0.01" value="${priceValue}" placeholder="0.00" />
-      </label>
-      <label>Currency
-        <input type="text" name="option_currency_${index}" maxlength="3" value="${escapeHtml(existing?.currency ?? "AUD")}" placeholder="AUD" style="text-transform:uppercase" />
-      </label>
+    <div class="option-form-head">
+      <legend>Option ${index + 1}</legend>
+      <button type="button" class="btn btn-ghost btn-small remove-option-btn">Remove</button>
     </div>
-    <div class="form-row">
-      <label>Original price (optional)
-        <input type="number" name="option_original_price_${index}" min="0" step="0.01" value="${originalValue}" placeholder="0.00" />
+    <div class="option-form-main">
+      <label class="file-drop file-drop-option" data-file-drop>
+        <input type="file" name="option_image_${index}" accept="image/*" class="file-drop-input" />
+        <span class="file-drop-visual"${existing?.imageId ? " hidden" : ""}>
+          <span class="file-drop-icon" aria-hidden="true">+</span>
+          <span class="file-drop-text">Photo</span>
+        </span>
+        <img class="file-drop-preview" alt="" ${existing?.imageId ? `src="/images/${existing.imageId}"` : "hidden"} />
       </label>
-      <label>Condition (optional)
-        <input type="text" name="option_condition_${index}" maxlength="60" value="${escapeHtml(existing?.condition ?? "")}" placeholder="e.g. new, used" />
-      </label>
+      <div class="option-form-fields">
+        <label>Name
+          <input type="text" name="option_name_${index}" maxlength="80" value="${escapeHtml(existing?.name ?? "")}" placeholder="e.g. Western Mountaineering MegaLite" />
+        </label>
+        <div class="form-row">
+          <label>Expected price
+            <input type="number" name="option_price_${index}" min="0" step="0.01" value="${priceValue}" placeholder="0.00" />
+          </label>
+          <label>Currency
+            <input type="text" name="option_currency_${index}" maxlength="3" value="${escapeHtml(existing?.currency ?? "AUD")}" placeholder="AUD" style="text-transform:uppercase" />
+          </label>
+        </div>
+      </div>
     </div>
-    <label>Sale note (optional)
-      <input type="text" name="option_sale_note_${index}" maxlength="120" value="${escapeHtml(existing?.saleNote ?? "")}" placeholder="e.g. 20% off until Friday" />
-    </label>
-    <label>Source link (optional)
-      <input type="url" name="option_source_url_${index}" maxlength="500" value="${escapeHtml(existing?.sourceUrl ?? "")}" placeholder="https://…" />
-    </label>
-    <button type="button" class="btn btn-ghost btn-small remove-option-btn">Remove this option</button>
+    ${existing?.imageId ? `<p class="hint">Uploading a new photo replaces this one.</p>` : ""}
+    <details class="option-more-details">
+      <summary>More details <span class="hint">(original price, condition, sale note, link — all optional)</span></summary>
+      <div class="option-more-details-fields">
+        <div class="form-row">
+          <label>Original price (optional)
+            <input type="number" name="option_original_price_${index}" min="0" step="0.01" value="${originalValue}" placeholder="0.00" />
+          </label>
+          <label>Condition (optional)
+            <input type="text" name="option_condition_${index}" maxlength="60" value="${escapeHtml(existing?.condition ?? "")}" placeholder="e.g. new, used" />
+          </label>
+        </div>
+        <label>Sale note (optional)
+          <input type="text" name="option_sale_note_${index}" maxlength="120" value="${escapeHtml(existing?.saleNote ?? "")}" placeholder="e.g. 20% off until Friday" />
+        </label>
+        <label>Source link (optional)
+          <input type="url" name="option_source_url_${index}" maxlength="500" value="${escapeHtml(existing?.sourceUrl ?? "")}" placeholder="https://…" />
+        </label>
+      </div>
+    </details>
   </fieldset>`;
 }
 
@@ -565,10 +638,18 @@ export function createEditPostPage(
     </label>
 
     <div class="single-product-fields"${postMode === "WHICH_ONE" ? " hidden" : ""}>
-      <label>Photos (1–4)
-        <input type="file" name="images" accept="image/*" multiple capture="environment" />
+      <div class="field-group">
+        <span class="field-group-label">Photos (1–4)</span>
+        <label class="file-drop file-drop-multi" data-file-drop-multi>
+          <input type="file" name="images" accept="image/*" multiple capture="environment" class="file-drop-input" />
+          <span class="file-drop-visual">
+            <span class="file-drop-icon" aria-hidden="true">+</span>
+            <span class="file-drop-text">Choose photos, or drag them here</span>
+          </span>
+          <span class="file-drop-preview-row"></span>
+        </label>
         <span class="hint">JPEG, PNG, WebP, or GIF. Each photo is re-encoded and stripped of location/metadata.</span>
-      </label>
+      </div>
       ${isEdit && existingImageIds.length > 0
         ? `<div class="existing-images">${existingImageIds.map((id) => `<img src="/images/${id}" alt="" class="existing-image-thumb" />`).join("")}<p class="hint">Uploading new photos replaces these.</p></div>`
         : ""}

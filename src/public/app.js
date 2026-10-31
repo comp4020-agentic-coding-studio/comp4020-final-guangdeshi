@@ -295,6 +295,104 @@ function initCurrencyUppercase() {
 }
 
 /**
+ * Image upload drop targets: each `.file-drop` is a real <label> wrapping a
+ * real <input type=file> (see src/pages.ts), so clicking, dragging a file
+ * onto it, and plain keyboard Tab+Enter/Space all already work with zero JS
+ * — this only adds two enhancements neither keyboard nor click needs: a
+ * live thumbnail preview via FileReader (no upload round-trip, the file
+ * never leaves the browser until actual form submit) and a hover state
+ * while a file is dragged over it. A drop target rendered inside an
+ * "+ Add option" clone is wired up by renumberOptionBlocks calling this
+ * same function again on the new node, same pattern as attachRemoveHandler.
+ */
+function initFileDrop(root = document) {
+  root.querySelectorAll("[data-file-drop]").forEach((drop) => {
+    if (drop.dataset.fileDropWired) return;
+    drop.dataset.fileDropWired = "true";
+    const input = drop.querySelector(".file-drop-input");
+    const visual = drop.querySelector(".file-drop-visual");
+    const preview = drop.querySelector(".file-drop-preview");
+    if (!input || !preview) return;
+
+    function showPreview(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        preview.src = String(reader.result);
+        preview.hidden = false;
+        if (visual) visual.hidden = true;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    input.addEventListener("change", () => {
+      if (input.files && input.files[0]) showPreview(input.files[0]);
+    });
+    ["dragenter", "dragover"].forEach((evt) =>
+      drop.addEventListener(evt, (e) => {
+        e.preventDefault();
+        drop.classList.add("file-drop-dragging");
+      }),
+    );
+    ["dragleave", "drop"].forEach((evt) =>
+      drop.addEventListener(evt, () => drop.classList.remove("file-drop-dragging")),
+    );
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer?.files?.[0];
+      if (file) {
+        input.files = e.dataTransfer.files;
+        showPreview(file);
+      }
+    });
+  });
+
+  root.querySelectorAll("[data-file-drop-multi]").forEach((drop) => {
+    if (drop.dataset.fileDropWired) return;
+    drop.dataset.fileDropWired = "true";
+    const input = drop.querySelector(".file-drop-input");
+    const row = drop.querySelector(".file-drop-preview-row");
+    if (!input || !row) return;
+
+    function showPreviews(files) {
+      row.innerHTML = "";
+      Array.from(files)
+        .slice(0, 4)
+        .forEach((file) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = document.createElement("img");
+            img.src = String(reader.result);
+            img.alt = "";
+            row.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        });
+    }
+
+    input.addEventListener("change", () => {
+      if (input.files && input.files.length > 0) showPreviews(input.files);
+    });
+    ["dragenter", "dragover"].forEach((evt) =>
+      drop.addEventListener(evt, (e) => {
+        e.preventDefault();
+        drop.classList.add("file-drop-dragging");
+      }),
+    );
+    ["dragleave", "drop"].forEach((evt) =>
+      drop.addEventListener(evt, () => drop.classList.remove("file-drop-dragging")),
+    );
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        input.files = files;
+        showPreviews(files);
+      }
+    });
+  });
+}
+
+/**
  * Create/edit post form behavior: all of this is pure client-side display
  * logic over HTML the server already fully rendered (every context-prompt
  * block for every category, every initial option block) — nothing here
@@ -386,11 +484,33 @@ function initPostForm() {
     const clone = template.cloneNode(true);
     clone.querySelectorAll("input").forEach((input) => {
       if (input.type === "file") return;
-      input.value = "";
+      // Blanking every field to "" also blanked currency, which the server
+      // only defaults to AUD when the field is *missing* entirely, not when
+      // it's present-but-empty — found via an actual 3-option submission
+      // test, which failed validation with "currency must be a 3-letter
+      // code" because the cloned option's currency input carried an empty
+      // string into the request instead of either "AUD" or nothing at all.
+      input.value = input.name.startsWith("option_currency_") ? "AUD" : "";
     });
     clone.querySelectorAll(".existing-image-thumb").forEach((img) => img.remove());
+    // cloneNode copies attributes (including the wired-marker and any
+    // preview <img> src left over from the template block) but not JS
+    // listeners, so both the preview state and the wired-marker need a
+    // manual reset before initFileDrop runs on the clone.
+    clone.querySelectorAll("[data-file-drop]").forEach((drop) => {
+      delete drop.dataset.fileDropWired;
+      const visual = drop.querySelector(".file-drop-visual");
+      const preview = drop.querySelector(".file-drop-preview");
+      if (visual) visual.hidden = false;
+      if (preview) {
+        preview.hidden = true;
+        preview.removeAttribute("src");
+      }
+    });
+    clone.querySelectorAll(".option-more-details").forEach((details) => (details.open = false));
     optionBlocksContainer.appendChild(clone);
     attachRemoveHandler(clone);
+    initFileDrop(clone);
     renumberOptionBlocks();
   });
 }
@@ -437,3 +557,4 @@ initGallery();
 initCurrencyUppercase();
 initMobileNav();
 initPostForm();
+initFileDrop();

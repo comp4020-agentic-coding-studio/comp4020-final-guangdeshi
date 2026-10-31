@@ -404,7 +404,13 @@ async function handle(ctx: RequestContext): Promise<void> {
 function handleLanding(ctx: RequestContext): void {
   const { posts } = listFeed({ limit: 6 });
   const featured = posts.map(toDiscoverItem);
-  sendHtml(ctx.res, 200, landingPage(viewerContextOf(ctx), featured));
+  // When there are no real posts yet, the honest thing to show a visitor is
+  // that fact plus a few labelled demo scenarios as a preview of the
+  // format — never silently filling the real feed section with demo posts
+  // unlabelled, which would let synthetic content pass as real community
+  // activity (see Feature D's is_demo separation, CLAUDE.md rule 26).
+  const demoPreview = featured.length === 0 ? getDemoFeed(4).map(toDiscoverItem) : [];
+  sendHtml(ctx.res, 200, landingPage(viewerContextOf(ctx), featured, demoPreview));
 }
 
 function handleReadme(ctx: RequestContext): void {
