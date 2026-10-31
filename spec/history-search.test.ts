@@ -51,7 +51,7 @@ describe("historical decision search", () => {
     const alice = await registerUser();
     await createPost(alice, { title: "Searchable espresso machine decision UNIQUEWORD42" });
 
-    const res = await fetch(new URL("/discover?q=UNIQUEWORD42", baseUrl()));
+    const res = await fetch(new URL("/discover?view=questions&q=UNIQUEWORD42", baseUrl()));
     const html = await res.text();
     expect(html).toContain("Searchable espresso machine decision UNIQUEWORD42");
   });
@@ -71,7 +71,7 @@ describe("historical decision search", () => {
     const alice = await registerUser();
     await createPost(alice, { title: "Hidden unlisted post ZEBRAWORD99", visibility: "unlisted" });
 
-    const res = await fetch(new URL("/discover?q=ZEBRAWORD99", baseUrl()));
+    const res = await fetch(new URL("/discover?view=questions&q=ZEBRAWORD99", baseUrl()));
     const html = await res.text();
     expect(html).not.toContain("Hidden unlisted post ZEBRAWORD99");
   });

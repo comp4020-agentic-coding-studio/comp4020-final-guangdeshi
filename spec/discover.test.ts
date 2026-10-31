@@ -20,7 +20,7 @@ describe("discover: most discussed sort", () => {
     const unlistedId = await createPost(author, { title: "Unlisted discussed post XYZ", visibility: "unlisted" });
     await submitOpinion(voter, unlistedId, "BUY", "Should not surface this in discover");
 
-    const res = await fetch(new URL("/discover?sort=discussed", baseUrl()));
+    const res = await fetch(new URL("/discover?view=questions&sort=discussed", baseUrl()));
     const html = await res.text();
     expect(html).not.toContain("Unlisted discussed post XYZ");
   });
@@ -41,14 +41,14 @@ describe("discover: pagination", () => {
       await createPost(author, { title, category: "books-hobbies" });
     }
 
-    const firstPage = await fetch(new URL("/discover?category=books-hobbies", baseUrl()));
+    const firstPage = await fetch(new URL("/discover?view=questions&category=books-hobbies", baseUrl()));
     const firstHtml = await firstPage.text();
     const cursorMatch = firstHtml.match(/cursor=([^"&]+)/);
     expect(cursorMatch, "expected a Load more cursor link on a 22-post category page").toBeTruthy();
 
     const cursor = decodeURIComponent(cursorMatch![1]);
     const secondPage = await fetch(
-      new URL(`/discover?category=books-hobbies&cursor=${encodeURIComponent(cursor)}`, baseUrl()),
+      new URL(`/discover?view=questions&category=books-hobbies&cursor=${encodeURIComponent(cursor)}`, baseUrl()),
     );
     const secondHtml = await secondPage.text();
 
@@ -68,7 +68,7 @@ describe("discover: category and search", () => {
     await createPost(author, { title: "Computing category post XYZ", category: "computing" });
     await createPost(author, { title: "Audio category post XYZ", category: "audio" });
 
-    const res = await fetch(new URL("/discover?category=audio", baseUrl()));
+    const res = await fetch(new URL("/discover?view=questions&category=audio", baseUrl()));
     const html = await res.text();
     expect(html).toContain("Audio category post XYZ");
     expect(html).not.toContain("Computing category post XYZ");
@@ -79,81 +79,76 @@ describe("discover: category and search", () => {
     await createPost(author, { title: "Unique Searchable Widget Name 42", description: "generic description" });
     await createPost(author, { title: "Totally different title", description: "nothing special" });
 
-    const res = await fetch(new URL("/discover?q=" + encodeURIComponent("Searchable Widget"), baseUrl()));
+    const res = await fetch(new URL("/discover?view=questions&q=" + encodeURIComponent("Searchable Widget"), baseUrl()));
     const html = await res.text();
     expect(html).toContain("Unique Searchable Widget Name 42");
     expect(html).not.toContain("Totally different title");
   });
 });
 
-// Content-source views (All questions / Community / Demo examples). The
-// per-source *filtering correctness* (does source=X actually include/
-// exclude the right rows) is covered end to end in
-// spec/discover-sources.test.ts against an isolated database, since
-// creating an is_demo=1 post requires calling src/db.ts directly. What
-// belongs here, against the shared HTTP test server, is the request/response
-// *plumbing* around that: default behavior, invalid-input handling, the
-// legacy URL redirect, and that the three tabs/empty-state render with the
-// right text and links for a real request.
-describe("discover: content-source param handling", () => {
-  it("a bare /discover (no ?source=) defaults to the 'all' view, not silently to 'community'", async () => {
+// Discover's two views (Products / Questions) and the legacy ?source= and
+// /discover/demo URLs, which now forward rather than break. Demo scenarios
+// and external references moved to the /showcase archive.
+describe("discover: views and legacy URLs", () => {
+  it("a bare /discover defaults to the Products view", async () => {
     const res = await fetch(new URL("/discover", baseUrl()));
     const html = await res.text();
-    expect(html).toContain('aria-current="page">All questions<');
+    expect(html).toContain('aria-current="page">Products<');
+    expect(html).toContain('class="product-grid"');
   });
 
-  it("an invalid ?source= value falls back to 'all' rather than erroring or silently narrowing", async () => {
-    const res = await fetch(new URL("/discover?source=not-a-real-source", baseUrl()));
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toContain('aria-current="page">All questions<');
+  it("?view=questions marks the Questions tab active; an unknown view falls back to Products", async () => {
+    const questionsHtml = await (await fetch(new URL("/discover?view=questions", baseUrl()))).text();
+    expect(questionsHtml).toContain('aria-current="page">Questions<');
+    const bogus = await fetch(new URL("/discover?view=nope", baseUrl()));
+    expect(bogus.status).toBe(200);
+    expect(await bogus.text()).toContain('aria-current="page">Products<');
   });
 
-  it("?source=community, ?source=demo, and ?source=references each mark their own tab active", async () => {
-    const communityHtml = await (await fetch(new URL("/discover?source=community", baseUrl()))).text();
-    expect(communityHtml).toContain('aria-current="page">Community<');
-    const demoHtml = await (await fetch(new URL("/discover?source=demo", baseUrl()))).text();
-    expect(demoHtml).toContain('aria-current="page">Demo examples<');
-    expect(demoHtml).toContain("Explore fictional purchasing scenarios");
-    const referencesHtml = await (await fetch(new URL("/discover?source=references", baseUrl()))).text();
-    expect(referencesHtml).toContain('aria-current="page">Real-world examples<');
-    expect(referencesHtml).toContain("Real purchasing discussions from elsewhere on the web");
+  it("only two primary tabs exist — no demo or reference tab in Discover", async () => {
+    const html = await (await fetch(new URL("/discover", baseUrl()))).text();
+    expect(html).not.toContain("Demo examples");
+    expect(html).not.toContain("Real-world examples");
   });
 
-  it("GET /discover/demo redirects into the unified page with source=demo selected (legacy URL stays bookmarkable)", async () => {
+  it("legacy ?source=demo / ?source=references redirect to the showcase archive", async () => {
+    const demo = await fetch(new URL("/discover?source=demo", baseUrl()), { redirect: "manual" });
+    expect(demo.status).toBe(303);
+    expect(new URL(demo.headers.get("location")!, baseUrl()).pathname).toBe("/showcase");
+    const refs = await fetch(new URL("/discover?source=references", baseUrl()), { redirect: "manual" });
+    expect(refs.status).toBe(303);
+    expect(new URL(refs.headers.get("location")!, baseUrl()).pathname).toBe("/showcase/references");
+  });
+
+  it("legacy ?source=community keeps its filters and lands on the Questions view", async () => {
+    const res = await fetch(new URL("/discover?source=community&category=audio", baseUrl()), { redirect: "manual" });
+    expect(res.status).toBe(303);
+    const target = new URL(res.headers.get("location")!, baseUrl());
+    expect(target.searchParams.get("view")).toBe("questions");
+    expect(target.searchParams.get("category")).toBe("audio");
+    expect(target.searchParams.get("source")).toBeNull();
+  });
+
+  it("GET /discover/demo redirects to the showcase archive (legacy URL stays bookmarkable)", async () => {
     const res = await fetch(new URL("/discover/demo", baseUrl()), { redirect: "manual" });
     expect(res.status).toBe(303);
-    const location = res.headers.get("location")!;
-    const redirectedUrl = new URL(location, baseUrl());
-    expect(redirectedUrl.pathname).toBe("/discover");
-    expect(redirectedUrl.searchParams.get("source")).toBe("demo");
+    expect(new URL(res.headers.get("location")!, baseUrl()).pathname).toBe("/showcase");
   });
 
-  it("/discover/demo preserves an existing category filter through the redirect", async () => {
-    const res = await fetch(new URL("/discover/demo?category=audio", baseUrl()), { redirect: "manual" });
-    const location = res.headers.get("location")!;
-    const redirectedUrl = new URL(location, baseUrl());
-    expect(redirectedUrl.searchParams.get("category")).toBe("audio");
-    expect(redirectedUrl.searchParams.get("source")).toBe("demo");
-  });
-
-  it("the search and sort links on the page carry the current ?source= forward, so a filter combination survives navigation", async () => {
-    const res = await fetch(new URL("/discover?source=community&category=computing", baseUrl()));
-    const html = await res.text();
-    // The "Most discussed" sort link must keep both the chosen source and
-    // category, not silently reset either one when a visitor clicks it.
+  it("the sort links on the Questions view carry view and category forward", async () => {
+    const html = await (await fetch(new URL("/discover?view=questions&category=computing", baseUrl()))).text();
     const sortLinkMatch = html.match(/href="\/discover\?([^"]*sort=discussed[^"]*)"/);
     expect(sortLinkMatch, "expected a 'Most discussed' link on the page").toBeTruthy();
-    const sortParams = new URLSearchParams(sortLinkMatch![1]);
-    expect(sortParams.get("source")).toBe("community");
+    const sortParams = new URLSearchParams(sortLinkMatch![1].replace(/&amp;/g, "&"));
+    expect(sortParams.get("view")).toBe("questions");
     expect(sortParams.get("category")).toBe("computing");
   });
 
-  it("a category with zero matches in the current source shows a specific empty state with a reset link and a cross-link to demo examples, not a bare blank page", async () => {
-    const res = await fetch(new URL("/discover?source=community&category=vehicles&q=" + encodeURIComponent(`NoSuchPostAnywhere${Date.now()}`), baseUrl()));
+  it("a Questions filter with zero matches shows a specific empty state with a reset link and a path to products", async () => {
+    const res = await fetch(new URL("/discover?view=questions&category=vehicles&q=" + encodeURIComponent(`NoSuchPostAnywhere${Date.now()}`), baseUrl()));
     const html = await res.text();
-    expect(html).toContain("Nothing here yet");
-    expect(html).toContain("Reset category");
-    expect(html).toContain("See demo examples instead");
+    expect(html).toContain("No questions match");
+    expect(html).toContain("Clear filters");
+    expect(html).toContain("Browse products");
   });
 });

@@ -5,6 +5,7 @@
 import type { Category, Opinion, OpinionWithAuthor, Post, PostContext, PostMode, PostOutcome, PurchaseOption, User } from "./db.ts";
 import { getContextPrompts, type ContextPrompt } from "./context-prompts.ts";
 import type { ExternalReference } from "./external-references.ts";
+import type { CatalogImportSource, CatalogProduct, CatalogProductImage } from "./catalog.ts";
 import { escapeHtml } from "./validation.ts";
 import {
   categoryOptions,
@@ -16,6 +17,7 @@ import {
   opinionBadge,
   outcomeBadge,
   postCard,
+  productCard,
   purchaseOptionCard,
   referenceCard,
   relatedDecisionCard,
@@ -29,7 +31,7 @@ import {
 export function landingPage(
   viewer: ViewerContext,
   featured: Array<{ post: Post; coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number }>,
-  demoPreview: Array<{ post: Post; coverImageId: string | null; authorHandle: string; authorDisplayName: string; categoryName: string; buyCount: number; passCount: number; comparisonOpinionCount?: number }> = [],
+  featuredProducts: DiscoverProductItem[] = [],
 ): string {
   // Core user journey, made literal in the page's own section order: the
   // purchasing question comes first (the hero names the actual question
@@ -38,24 +40,29 @@ export function landingPage(
   // if any exist, otherwise an honest "we're new" state that offers the
   // labelled demo content instead of a bare empty box or a wall of
   // decoration standing in for substance.
+  const productSection = featuredProducts.length > 0
+    ? `<section class="section">
+        <div class="section-header">
+          <h2>Start from a real product</h2>
+          <a href="/discover" class="link-more">Browse the catalog →</a>
+        </div>
+        <div class="product-grid">${featuredProducts.map((p) => productCard(p.product, p.image, { categoryName: p.categoryName, questionCount: p.questionCount })).join("\n")}</div>
+      </section>`
+    : "";
   const realFeedSection = featured.length > 0
     ? `<section class="section">
         <div class="section-header">
           <h2>Recent purchasing questions</h2>
-          <a href="/discover?source=community" class="link-more">See all →</a>
+          <a href="/discover?view=questions" class="link-more">See all →</a>
         </div>
         <div class="post-grid">${featured.map((f) => postCard(f.post, f)).join("\n")}</div>
       </section>`
     : `<section class="section section-new-platform">
         <div class="new-platform-card">
-          <h2>This community is just getting started</h2>
-          <p>Buy or Pass doesn't have real posts yet — you'd be looking at an empty page if we didn't say so. Here's what it looks like once people are actually using it: ${demoPreview.length} fictional, clearly labelled example decisions below, written to show the format, not to fake activity.</p>
-          <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand btn-large">Post the first real one</a>
+          <h2>No community questions yet</h2>
+          <p>Buy or Pass is new, and we won't fill this space with made-up activity. Pick a product above, or ask about anything you're weighing up, and yours will be the first.</p>
+          <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand btn-large">Ask the first question</a>
         </div>
-        ${demoPreview.length > 0
-          ? `<div class="post-grid">${demoPreview.map((f) => postCard(f.post, f)).join("\n")}</div>
-             <div class="load-more-row"><a href="/discover?source=demo" class="link-more">See all demo scenarios →</a></div>`
-          : ""}
       </section>`;
 
   const body = `
@@ -74,6 +81,8 @@ export function landingPage(
     </div>
   </div>
 </section>
+
+${productSection}
 
 ${realFeedSection}
 
@@ -145,6 +154,7 @@ export function loginPage(viewer: ViewerContext, error: string | null, values: {
 export interface DiscoverFeedItem {
   post: Post;
   coverImageId: string | null;
+  coverImageUrl?: string | null; // a linked catalog product's real photo, when the post has no uploaded one
   authorHandle: string;
   authorDisplayName: string;
   categoryName: string;
@@ -158,168 +168,280 @@ export interface DiscoverFeedItem {
   comparisonOpinionCount?: number;
 }
 
-export type DiscoverSource = "all" | "community" | "demo" | "references";
+export type DiscoverView = "products" | "questions";
 
 export interface DiscoverFilters {
+  view: DiscoverView;
   categoryId?: string;
   search?: string;
   sort?: "recent" | "discussed";
-  source?: DiscoverSource;
+  page?: number;
 }
 
 /**
- * A single unified Discover, not two separate pages — "All questions" mixes
- * real community posts with clearly-labelled fictional demo scenarios (each
- * card still carries its own real isDemo flag, see postCard's demo-tag
- * overlay, so nothing here blurs the database-level distinction);
- * "Community" and "Demo examples" are the same query with the is_demo
- * filter pinned one way or the other. Every link below (category pill,
- * source tab, sort toggle, search form, pagination) round-trips through
- * the same param set so a filter combination survives navigation and is
- * itself a shareable URL, per the brief's own URL-shareability expectation.
+ * Every link on Discover (view switch, category pill, sort, search,
+ * pagination) round-trips through this, so a filter combination survives
+ * navigation and is itself a shareable URL.
  */
 function discoverParams(filters: DiscoverFilters, overrides: Record<string, string | undefined>): string {
   const params = new URLSearchParams();
-  const merged = {
+  const merged: Record<string, string | undefined> = {
+    view: filters.view === "questions" ? "questions" : undefined,
     category: filters.categoryId,
     q: filters.search,
-    source: filters.source && filters.source !== "all" ? filters.source : undefined,
-    sort: filters.sort === "discussed" ? "discussed" : undefined,
+    sort: filters.view === "questions" && filters.sort === "discussed" ? "discussed" : undefined,
     ...overrides,
   };
   for (const [key, value] of Object.entries(merged)) {
     if (value) params.set(key, value);
   }
-  return params.toString();
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
 }
+
+export interface DiscoverProductItem {
+  product: CatalogProduct;
+  image: CatalogProductImage | null;
+  categoryName: string;
+  questionCount: number;
+}
+
+/**
+ * Discover is one place to browse two genuinely different things: real
+ * catalog products (the default — image-led, factual) and real
+ * community purchasing questions. Fictional demo scenarios and the archived
+ * external-reference research are deliberately NOT here; they live at
+ * /showcase, clearly labelled, so nothing on this page implies activity
+ * that didn't happen.
+ */
+export function discoverPage(
+  viewer: ViewerContext,
+  categories: Category[],
+  filters: DiscoverFilters,
+  data: {
+    products?: DiscoverProductItem[];
+    productTotal?: number;
+    totalPages?: number;
+    questions?: DiscoverFeedItem[];
+    nextCursor?: string | null;
+  },
+): string {
+  const isQuestions = filters.view === "questions";
+
+  const viewTabs = (["products", "questions"] as const)
+    .map((v) => {
+      const label = v === "products" ? "Products" : "Questions";
+      const active = filters.view === v;
+      return `<a href="/discover${discoverParams(filters, { view: v === "questions" ? "questions" : undefined, sort: undefined, page: undefined, cursor: undefined })}" class="source-tab${active ? " source-tab-active" : ""}" aria-current="${active ? "page" : "false"}">${label}</a>`;
+    })
+    .join("");
+
+  const categoryPills = [`<a href="/discover${discoverParams(filters, { category: undefined, page: undefined, cursor: undefined })}" class="pill${!filters.categoryId ? " pill-active" : ""}">All</a>`]
+    .concat(
+      categories.map(
+        (c) =>
+          `<a href="/discover${discoverParams(filters, { category: c.id, page: undefined, cursor: undefined })}" class="pill${filters.categoryId === c.id ? " pill-active" : ""}">${escapeHtml(c.name)}</a>`,
+      ),
+    )
+    .join("");
+
+  const resetLink = filters.categoryId || filters.search
+    ? `<a href="/discover${discoverParams({ view: filters.view }, {})}" class="link-more">Clear filters →</a>`
+    : "";
+
+  let main: string;
+  if (!isQuestions) {
+    const products = data.products ?? [];
+    const page = filters.page ?? 1;
+    const totalPages = data.totalPages ?? 1;
+    const pager = totalPages > 1
+      ? `<nav class="pager" aria-label="Product pages">
+          ${page > 1 ? `<a class="btn btn-ghost btn-small" href="/discover${discoverParams(filters, { page: page - 1 > 1 ? String(page - 1) : undefined })}">← Previous</a>` : `<span></span>`}
+          <span class="pager-status">Page ${page} of ${totalPages}</span>
+          ${page < totalPages ? `<a class="btn btn-ghost btn-small" href="/discover${discoverParams(filters, { page: String(page + 1) })}">Next →</a>` : `<span></span>`}
+        </nav>`
+      : "";
+    main = products.length > 0
+      ? `<p class="discover-count">${data.productTotal ?? products.length} product${(data.productTotal ?? products.length) === 1 ? "" : "s"}${filters.search ? ` matching “${escapeHtml(filters.search)}”` : ""}</p>
+         <div class="product-grid">${products.map((p) => productCard(p.product, p.image, { categoryName: p.categoryName, questionCount: p.questionCount })).join("\n")}</div>
+         ${pager}`
+      : `<div class="empty-state">
+          <div class="empty-state-icon">🔍</div>
+          <h3>No products match</h3>
+          <p>${filters.search ? `Nothing in the catalog matches “${escapeHtml(filters.search)}”${filters.categoryId ? " in this category" : ""}.` : "The catalog has no products in this category yet."} You can still ask about something that isn't listed.</p>
+          <div class="empty-state-actions">${resetLink}</div>
+          <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand">Ask about any product</a>
+        </div>`;
+  } else {
+    const questions = data.questions ?? [];
+    const sortToggle = `<div class="sort-toggle" role="radiogroup" aria-label="Sort questions">
+      <a href="/discover${discoverParams(filters, { sort: undefined, cursor: undefined })}" class="sort-option${filters.sort !== "discussed" ? " active" : ""}">Recent</a>
+      <a href="/discover${discoverParams(filters, { sort: "discussed", cursor: undefined })}" class="sort-option${filters.sort === "discussed" ? " active" : ""}">Most discussed</a>
+    </div>`;
+    const nextLink = data.nextCursor
+      ? `<div class="load-more-row"><a class="btn btn-ghost" href="/discover${discoverParams(filters, { cursor: data.nextCursor })}">Load more →</a></div>`
+      : "";
+    main = `${sortToggle}
+      ${questions.length > 0
+        ? `<div class="post-grid">${questions.map((i) => postCard(i.post, i)).join("\n")}</div>${nextLink}`
+        : `<div class="empty-state">
+            <div class="empty-state-icon">💬</div>
+            <h3>${filters.search || filters.categoryId ? "No questions match" : "No community questions yet"}</h3>
+            <p>${filters.search || filters.categoryId
+              ? "No real community question matches these filters yet."
+              : "Buy or Pass is new — nobody has asked a question here yet. Pick a product and be the first."}</p>
+            <div class="empty-state-actions">
+              ${resetLink}
+              <a href="/discover${discoverParams({ view: "products", categoryId: filters.categoryId }, {})}" class="link-more">Browse products →</a>
+            </div>
+            <a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand">Ask a question</a>
+          </div>`}`;
+  }
+
+  const body = `
+<section class="discover-header">
+  <div>
+    <h1>Discover</h1>
+    <p class="discover-intro">${isQuestions
+      ? "Real purchasing questions from the Buy or Pass community."
+      : "Real products with real photos. Pick one and ask the community whether it fits your situation."}</p>
+  </div>
+  <form method="get" action="/discover" class="search-form" role="search">
+    ${isQuestions ? `<input type="hidden" name="view" value="questions" />` : ""}
+    ${filters.categoryId ? `<input type="hidden" name="category" value="${escapeHtml(filters.categoryId)}" />` : ""}
+    <input type="search" name="q" placeholder="${isQuestions ? "Search questions…" : "Search products or brands…"}" value="${escapeHtml(filters.search ?? "")}" aria-label="${isQuestions ? "Search questions" : "Search products"}" />
+    <button type="submit" class="btn btn-brand">Search</button>
+  </form>
+</section>
+<nav class="source-tabs" aria-label="Browse">${viewTabs}</nav>
+<nav class="category-pills" aria-label="Filter by category">${categoryPills}</nav>
+<section class="discover-main">${main}</section>`;
+  return layout({ title: "Discover", viewer, activeNav: "discover", body, bodyClass: "page-discover" });
+}
+
+// ------------------------------------------------------- product detail ---
+
+export interface ProductDetailData {
+  product: CatalogProduct;
+  image: CatalogProductImage | null;
+  attributes: { name: string; value: string }[];
+  category: Category;
+  source: CatalogImportSource | undefined;
+  questions: DiscoverFeedItem[];
+}
+
+export function productDetailPage(viewer: ViewerContext, data: ProductDetailData): string {
+  const { product, image, attributes, category, source, questions } = data;
+  const askHref = `/posts/new?product=${encodeURIComponent(product.id)}`;
+  const facts = [
+    product.brand ? { name: "Brand", value: product.brand } : null,
+    { name: "Category", value: category.name },
+    ...attributes,
+  ].filter((f): f is { name: string; value: string } => !!f);
+
+  const body = `
+<nav class="breadcrumb" aria-label="Breadcrumb"><a href="/discover">Discover</a> › <a href="/discover?category=${escapeHtml(category.id)}">${escapeHtml(category.name)}</a></nav>
+<article class="product-detail">
+  <div class="product-detail-media">
+    ${image ? `<img src="${escapeHtml(image.filePath)}" alt="${escapeHtml(product.name)}" width="${image.width}" height="${image.height}" />` : ""}
+    <p class="product-credit">Photo: Amazon.com, via <a href="${escapeHtml(source?.sourceUrl ?? "/credits")}" rel="noopener" target="_blank">Amazon Berkeley Objects</a> · <a href="${escapeHtml(source?.licenseUrl ?? "https://creativecommons.org/licenses/by/4.0/")}" rel="noopener license" target="_blank">CC BY 4.0</a> · resized</p>
+  </div>
+  <div class="product-detail-info">
+    <p class="product-card-eyebrow">${escapeHtml(category.name)}${product.brand ? ` · ${escapeHtml(product.brand)}` : ""}</p>
+    <h1 class="product-detail-title">${escapeHtml(product.name)}</h1>
+    ${product.keyAttribute ? `<p class="product-detail-attr">${escapeHtml(product.keyAttribute)}</p>` : ""}
+
+    <div class="product-detail-actions">
+      <a href="${askHref}" class="btn btn-brand btn-large">Ask about this product</a>
+      <button type="button" class="btn btn-ghost" data-compare-toggle data-product-id="${escapeHtml(product.id)}" data-product-name="${escapeHtml(product.name)}">+ Add to comparison</button>
+    </div>
+    <p class="hint">You'll add what only you know — what you own now, how you'll use it, and the price you've been offered. Catalog data has no current price or availability.</p>
+
+    ${facts.length > 0
+      ? `<dl class="product-facts">${facts.map((f) => `<div><dt>${escapeHtml(f.name)}</dt><dd>${escapeHtml(f.value)}</dd></div>`).join("")}</dl>`
+      : ""}
+    ${product.features.length > 0
+      ? `<details class="product-features"><summary>Listed features</summary><ul>${product.features.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul><p class="hint">From the original catalog listing: “${escapeHtml(product.originalTitle)}”</p></details>`
+      : ""}
+  </div>
+</article>
+
+<section class="section product-questions" id="questions">
+  <div class="section-header"><h2>Community questions about this product</h2></div>
+  ${questions.length > 0
+    ? `<div class="post-grid">${questions.map((q) => postCard(q.post, q)).join("\n")}</div>`
+    : `<div class="product-questions-empty">
+        <p>Nobody has asked about this product yet.</p>
+        <a href="${askHref}" class="btn btn-brand">Be the first to ask</a>
+      </div>`}
+</section>`;
+  return layout({ title: product.name, viewer, activeNav: "discover", body, bodyClass: "page-product" });
+}
+
+// -------------------------------------------------------------- credits ---
+
+export function creditsPage(viewer: ViewerContext, sources: CatalogImportSource[], productCount: number): string {
+  const body = `
+<section class="form-section credits">
+  <h1>Product data and image credits</h1>
+  <p>Buy or Pass's product catalog (${productCount} products) is built from openly licensed data. Catalog records are factual product information only — they include no current prices, stock, ratings or reviews, and listing a product here is not an endorsement by its maker or seller.</p>
+  ${sources
+    .map(
+      (s) => `<div class="credit-source">
+        <h2>${escapeHtml(s.name)}</h2>
+        <p>${escapeHtml(s.attribution)}</p>
+        <ul>
+          <li>Source: <a href="${escapeHtml(s.sourceUrl)}" rel="noopener" target="_blank">${escapeHtml(s.sourceUrl)}</a></li>
+          <li>License: <a href="${escapeHtml(s.licenseUrl)}" rel="noopener license" target="_blank">${escapeHtml(s.license)}</a></li>
+          <li>Retrieved: ${escapeHtml(s.retrievedAt)}</li>
+        </ul>
+        <p class="hint">Dataset: Collins et al., “ABO: Dataset and Benchmarks for Real-World 3D Object Understanding”, CVPR 2022. Data credit: Amazon.com. Dataset built by Matthieu Guillaumin, Thomas Dideriksen, Kenan Deng, Himanshu Arora, Arnab Dhua, Xi (Brian) Zhang and Tomas Yago-Vicente (Amazon.com) and Jasmine Collins, Shubham Goel and Jitendra Malik (UC Berkeley). Changes made: images resized and re-encoded; product names shortened for display (each product page lists its original catalog title).</p>
+      </div>`,
+    )
+    .join("")}
+</section>`;
+  return layout({ title: "Credits", viewer, body, bodyClass: "page-credits" });
+}
+
+// ------------------------------------------------------------- showcase ---
 
 export interface DiscoverReferenceItem extends ExternalReference {
   categoryName: string;
   imageUrl: string | null;
 }
 
-export function discoverPage(
+/**
+ * Archive of the project's earlier content experiments, kept for evidence
+ * and testing but out of the primary browsing experience: the 18 fictional
+ * AI-authored demo scenarios (still labelled as such on every card) and the
+ * eight researched external discussions.
+ */
+export function showcasePage(
   viewer: ViewerContext,
-  items: DiscoverFeedItem[],
-  categories: Category[],
-  filters: DiscoverFilters,
-  nextCursor: string | null,
-  referenceItems: DiscoverReferenceItem[] = [],
+  section: "demo" | "references",
+  data: { demoItems?: DiscoverFeedItem[]; referenceItems?: DiscoverReferenceItem[] },
 ): string {
-  const source = filters.source ?? "all";
-  const isReferences = source === "references";
-
-  const categoryPills = [`<a href="/discover?${discoverParams(filters, { category: undefined })}" class="pill${!filters.categoryId ? " pill-active" : ""}">All</a>`]
-    .concat(
-      categories.map(
-        (c) =>
-          `<a href="/discover?${discoverParams(filters, { category: c.id })}" class="pill${filters.categoryId === c.id ? " pill-active" : ""}">${escapeHtml(c.name)}</a>`,
-      ),
-    )
-    .join("");
-
-  const sourceTabs = ([
-    { key: "all" as const, label: "All questions" },
-    { key: "community" as const, label: "Community" },
-    { key: "demo" as const, label: "Demo examples" },
-    { key: "references" as const, label: "Real-world examples" },
-  ])
-    .map(
-      (t) =>
-        `<a href="/discover?${discoverParams(filters, { source: t.key === "all" ? undefined : t.key })}" class="source-tab${source === t.key ? " source-tab-active" : ""}" aria-current="${source === t.key ? "page" : "false"}">${t.label}</a>`,
-    )
-    .join("");
-
-  const nextLink = nextCursor
-    ? `<a class="btn btn-ghost" href="/discover?${discoverParams(filters, { cursor: nextCursor })}">Load more →</a>`
-    : "";
-
-  // References are a small, static set (8ish entries) — sorting "recent" vs
-  // "most discussed" is meaningless for them (no created_at that matters, no
-  // opinion count at all), so the sort toggle is simply omitted on this tab
-  // rather than rendered with controls that would do nothing.
-  const sortToggle = isReferences
-    ? ""
-    : `<div class="sort-toggle" role="radiogroup" aria-label="Sort posts">
-    <a href="/discover?${discoverParams(filters, { sort: undefined })}" class="sort-option${filters.sort !== "discussed" ? " active" : ""}">Recent</a>
-    <a href="/discover?${discoverParams(filters, { sort: "discussed" })}" class="sort-option${filters.sort === "discussed" ? " active" : ""}">Most discussed</a>
-  </div>`;
-
-  const sourceNoun =
-    source === "demo" ? "demo scenarios" : source === "community" ? "community posts" : source === "references" ? "real-world examples" : "posts or demo scenarios";
-  const resetLink = filters.categoryId
-    ? `<a href="/discover?${discoverParams(filters, { category: undefined })}" class="link-more">Reset category →</a>`
-    : "";
-  // A category with zero matches in the current source is a normal, expected
-  // state (not every category has 18 demo scenarios' worth of coverage) —
-  // the empty state names the actual reason and offers the two real ways
-  // out (reset the category, or look at demo examples instead) rather than
-  // a single generic "nothing here" box the brief explicitly said to avoid.
-  const demoCrossLink =
-    source !== "demo" && source !== "references"
-      ? `<a href="/discover?${discoverParams(filters, { source: "demo" })}" class="link-more">See demo examples instead →</a>`
-      : "";
-  const emptyBody = filters.search
-    ? `No ${sourceNoun} match "${filters.search}".`
-    : filters.categoryId
-    ? `No ${sourceNoun} in this category yet.`
-    : source === "community"
-    ? "This community is just getting started — no real posts yet."
-    : source === "demo"
-    ? "No demo scenarios yet — an admin hasn't seeded them."
-    : source === "references"
-    ? "No real-world examples in this category yet."
-    : "Nothing here yet.";
-
-  const introLine =
-    source === "demo"
-      ? `<p class="discover-intro">Explore fictional purchasing scenarios to see how different needs can lead to different buying decisions.</p>`
-      : source === "all"
-      ? `<p class="discover-intro">Real community questions and clearly-labelled fictional examples, together.</p>`
-      : source === "references"
-      ? `<p class="discover-intro">Real purchasing discussions from elsewhere on the web — not local posts, and not open to voting here.</p>`
-      : "";
-
-  const mainContent = isReferences
-    ? referenceItems.length > 0
-      ? `<div class="post-grid reference-grid">${referenceItems.map((r) => referenceCard(r)).join("\n")}</div>`
-      : `<div class="empty-state">
-          <div class="empty-state-icon">🔍</div>
-          <h3>Nothing here yet</h3>
-          <p>${escapeHtml(emptyBody)}</p>
-          <div class="empty-state-actions">
-            ${resetLink}
-          </div>
-        </div>`
-    : items.length > 0
-    ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div><div class="load-more-row">${nextLink}</div>`
-    : `<div class="empty-state">
-        <div class="empty-state-icon">🔍</div>
-        <h3>Nothing here yet</h3>
-        <p>${escapeHtml(emptyBody)}</p>
-        <div class="empty-state-actions">
-          ${resetLink}
-          ${demoCrossLink}
-        </div>
-        ${source !== "demo" ? `<a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand">Create a post</a>` : ""}
-      </div>`;
-
+  const tabs = `<nav class="source-tabs" aria-label="Showcase section">
+    <a href="/showcase" class="source-tab${section === "demo" ? " source-tab-active" : ""}" aria-current="${section === "demo" ? "page" : "false"}">Fictional demo scenarios</a>
+    <a href="/showcase/references" class="source-tab${section === "references" ? " source-tab-active" : ""}" aria-current="${section === "references" ? "page" : "false"}">Researched external discussions</a>
+  </nav>`;
+  const content = section === "demo"
+    ? `<p class="discover-intro">These scenarios are fictional, written by an AI model during development to show how the format works. The people, votes and outcomes in them are not real Buy or Pass activity.</p>
+       ${(data.demoItems ?? []).length
+         ? `<div class="post-grid">${data.demoItems!.map((i) => postCard(i.post, i)).join("\n")}</div>`
+         : `<p class="empty-state">No demo scenarios are loaded in this environment.</p>`}`
+    : `<p class="discover-intro">Real purchasing discussions found elsewhere on the web during research. They are external, not Buy or Pass posts, and not open to voting here.</p>
+       <div class="post-grid reference-grid">${(data.referenceItems ?? []).map((r) => referenceCard(r)).join("\n")}</div>`;
   const body = `
 <section class="discover-header">
-  <h1>Discover</h1>
-  <form method="get" action="/discover" class="search-form">
-    ${filters.categoryId ? `<input type="hidden" name="category" value="${escapeHtml(filters.categoryId)}" />` : ""}
-    ${source !== "all" ? `<input type="hidden" name="source" value="${escapeHtml(source)}" />` : ""}
-    <input type="search" name="q" placeholder="Search purchasing questions…" value="${escapeHtml(filters.search ?? "")}" aria-label="Search posts" />
-    <button type="submit" class="btn btn-brand">Search</button>
-  </form>
+  <div>
+    <h1>Showcase archive</h1>
+    <p class="discover-intro">Earlier content experiments, kept for reference. For real products and real community questions, go to <a href="/discover">Discover</a>.</p>
+  </div>
 </section>
-<nav class="source-tabs" aria-label="Content source">${sourceTabs}</nav>
-${introLine}
-<nav class="category-pills" aria-label="Filter by category">${categoryPills}</nav>
-${sortToggle}
-${mainContent}`;
-  return layout({ title: "Discover", viewer, activeNav: "discover", body, bodyClass: "page-discover" });
+${tabs}
+<section class="discover-main">${content}</section>`;
+  return layout({ title: "Showcase archive", viewer, body, bodyClass: "page-discover page-showcase" });
 }
 
 // --------------------------------------------------------- post detail ----
@@ -344,6 +466,10 @@ export interface PostDetailData {
   contextPrompts?: ContextPrompt[];
   relatedPosts?: Post[];
   influentialOpinionId?: string | null;
+  // The real catalog product a Buy or Pass question is about, if any, and
+  // each catalog-linked option's catalog photo (option id → URL).
+  catalogProduct?: { id: string; name: string; brand: string | null; imageUrl: string | null } | null;
+  optionCatalogImages?: Record<string, string | null>;
 }
 
 function optionNameFor(options: PurchaseOption[] | undefined, optionId: string | null): string | null {
@@ -365,6 +491,8 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         <div class="post-gallery-main"><img src="/images/${images[0].id}" alt="" id="gallery-main-img" /></div>
         ${images.length > 1 ? `<div class="post-gallery-thumbs">${images.map((img, i) => `<button type="button" class="gallery-thumb${i === 0 ? " active" : ""}" data-image-id="${img.id}"><img src="/images/${img.id}" alt="" /></button>`).join("")}</div>` : ""}
       </div>`
+    : data.catalogProduct?.imageUrl
+    ? `<div class="post-gallery"><div class="post-gallery-main post-gallery-catalog"><img src="${escapeHtml(data.catalogProduct.imageUrl)}" alt="${escapeHtml(data.catalogProduct.name)}" id="gallery-main-img" /></div></div>`
     : `<div class="post-gallery-placeholder">🛍️</div>`;
 
   const buyPassForm = `<form method="post" action="/posts/${post.id}/opinions" class="opinion-form" id="opinion-form">
@@ -492,7 +620,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
   const comparisonGrid = isComparison
     ? `<div class="comparison-grid">
         ${options
-          .map((opt) => purchaseOptionCard(opt, comparisonCounts.counts[opt.id] ?? 0, myOpinion?.selectedOptionId === opt.id))
+          .map((opt) => purchaseOptionCard(opt, comparisonCounts.counts[opt.id] ?? 0, myOpinion?.selectedOptionId === opt.id, data.optionCatalogImages?.[opt.id] ?? null))
           .join("\n")}
       </div>
       ${comparisonCounts.noneCount > 0 ? `<p class="muted comparison-none-count">✋ ${comparisonCounts.noneCount} said none of these</p>` : ""}`
@@ -518,6 +646,9 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       <h1>${escapeHtml(post.title)}</h1>
       <p class="post-detail-meta">by <a href="/u/${encodeURIComponent(author.handle)}">@${escapeHtml(author.handle)}</a> · ${timeAgo(post.createdAt)}</p>
       ${!isComparison && price ? `<p class="post-detail-price">${escapeHtml(price)}</p>` : ""}
+      ${data.catalogProduct
+        ? `<a class="post-catalog-link" href="/products/${escapeHtml(data.catalogProduct.id)}">About: <strong>${escapeHtml(data.catalogProduct.name)}</strong> — view product →</a>`
+        : ""}
       <p class="post-detail-description">${escapeHtml(post.description)}</p>
       ${post.tags.length > 0 ? `<div class="tag-row">${post.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       ${ownerControls}`;
@@ -589,6 +720,19 @@ export interface CreateEditPostMode {
   // real-world reference's "Ask your own version of this question" button),
   // never used in edit mode where the post's own existing category wins.
   preselectedCategoryId?: string;
+  // Create mode only — real catalog products this new question is about
+  // (one for Buy or Pass, 2-4 for Which One?). Factual product data only:
+  // the price is always the buyer's own, entered in the form.
+  catalogProducts?: CatalogFormProduct[];
+}
+
+export interface CatalogFormProduct {
+  id: string;
+  name: string;
+  categoryId: string;
+  imageUrl: string | null;
+  brand: string | null;
+  keyAttribute: string | null;
 }
 
 /**
@@ -603,10 +747,19 @@ export interface CreateEditPostMode {
  * move into a closed-by-default <details> so a 2-option post reads as two
  * short cards, not fourteen always-open inputs.
  */
-function optionFormBlock(index: number, existing?: PurchaseOption): string {
+/** "Which one: A vs B vs C", falling back to "Which one of these N?" when the full names won't fit the 120-char title limit — never a name cut mid-word. */
+function comparisonTitle(names: string[]): string {
+  const full = `Which one: ${names.join(" vs ")}`;
+  return full.length <= 120 ? full : `Which one of these ${names.length}?`;
+}
+
+function optionFormBlock(index: number, existing?: PurchaseOption, catalog?: CatalogFormProduct): string {
   const priceValue = existing ? (existing.expectedPriceCents / 100).toFixed(2) : "";
+  const catalogId = catalog?.id ?? existing?.catalogProductId ?? null;
+  const catalogImg = catalog?.imageUrl ?? null;
   const originalValue = existing?.originalPriceCents != null ? (existing.originalPriceCents / 100).toFixed(2) : "";
-  return `<fieldset class="option-form-block" data-option-index="${index}">
+  return `<fieldset class="option-form-block${catalogId ? " option-form-block-catalog" : ""}" data-option-index="${index}">
+    ${catalogId ? `<input type="hidden" name="option_catalog_product_id_${index}" value="${escapeHtml(catalogId)}" />` : ""}
     <div class="option-form-head">
       <legend>Option ${index + 1}</legend>
       <button type="button" class="btn btn-ghost btn-small remove-option-btn">Remove</button>
@@ -614,18 +767,18 @@ function optionFormBlock(index: number, existing?: PurchaseOption): string {
     <div class="option-form-main">
       <label class="file-drop file-drop-option" data-file-drop>
         <input type="file" name="option_image_${index}" accept="image/*" class="file-drop-input" />
-        <span class="file-drop-visual"${existing?.imageId ? " hidden" : ""}>
+        <span class="file-drop-visual"${existing?.imageId || catalogImg ? " hidden" : ""}>
           <span class="file-drop-icon" aria-hidden="true">+</span>
           <span class="file-drop-text">Photo</span>
         </span>
-        <img class="file-drop-preview" alt="" ${existing?.imageId ? `src="/images/${existing.imageId}"` : "hidden"} />
+        <img class="file-drop-preview" alt="" ${existing?.imageId ? `src="/images/${existing.imageId}"` : catalogImg ? `src="${escapeHtml(catalogImg)}"` : "hidden"} />
       </label>
       <div class="option-form-fields">
         <label>Name
-          <input type="text" name="option_name_${index}" maxlength="80" value="${escapeHtml(existing?.name ?? "")}" placeholder="e.g. Western Mountaineering MegaLite" />
+          <input type="text" name="option_name_${index}" maxlength="80" value="${escapeHtml(existing?.name ?? catalog?.name ?? "")}" placeholder="e.g. Western Mountaineering MegaLite" />
         </label>
         <div class="form-row">
-          <label>Expected price
+          <label>${catalogId ? "Your price" : "Expected price"}
             <input type="number" name="option_price_${index}" min="0" step="0.01" value="${priceValue}" placeholder="0.00" />
           </label>
           <label>Currency
@@ -634,7 +787,7 @@ function optionFormBlock(index: number, existing?: PurchaseOption): string {
         </div>
       </div>
     </div>
-    ${existing?.imageId ? `<p class="hint">Uploading a new photo replaces this one.</p>` : ""}
+    ${existing?.imageId ? `<p class="hint">Uploading a new photo replaces this one.</p>` : catalogImg ? `<p class="hint">Catalog photo (Amazon Berkeley Objects). Upload your own to replace it.</p>` : ""}
     <details class="option-more-details">
       <summary>More details <span class="hint">(original price, condition, sale note, link — all optional)</span></summary>
       <div class="option-more-details-fields">
@@ -666,14 +819,39 @@ export function createEditPostPage(
   const isEdit = mode.kind === "edit";
   const post = mode.post ?? null;
   const action = isEdit ? `/posts/${mode.post!.id}/edit` : "/posts/new";
-  const postMode: PostMode = post?.mode ?? "BUY_PASS";
+  const catalogProducts = !isEdit ? mode.catalogProducts ?? [] : [];
+  const postMode: PostMode = post?.mode ?? (catalogProducts.length >= 2 ? "WHICH_ONE" : "BUY_PASS");
+  const singleCatalog = postMode === "BUY_PASS" && catalogProducts.length === 1 ? catalogProducts[0] : null;
+  const preselectedCategory = post?.categoryId ?? mode.preselectedCategoryId ?? catalogProducts[0]?.categoryId;
   const existingOptions = mode.existingOptions ?? [];
   const existingImageIds = mode.existingImageIds ?? [];
   const existingContext = mode.existingContext ?? null;
 
   const optionBlocks = postMode === "WHICH_ONE"
-    ? (existingOptions.length > 0 ? existingOptions : [undefined, undefined]).map((opt, i) => optionFormBlock(i, opt)).join("\n")
+    ? existingOptions.length > 0
+      ? existingOptions.map((opt, i) => optionFormBlock(i, opt)).join("\n")
+      : catalogProducts.length >= 2
+      ? catalogProducts.slice(0, 4).map((c, i) => optionFormBlock(i, undefined, c)).join("\n")
+      : [0, 1].map((i) => optionFormBlock(i)).join("\n")
     : [0, 1].map((i) => optionFormBlock(i)).join("\n");
+
+  const catalogBanner = catalogProducts.length > 0
+    ? `<div class="catalog-selection">
+        <p class="catalog-selection-label">${catalogProducts.length === 1 ? "You're asking about" : `Comparing ${catalogProducts.length} catalog products`}</p>
+        <div class="catalog-selection-items">
+          ${catalogProducts
+            .map(
+              (c) => `<a href="/products/${escapeHtml(c.id)}" class="catalog-selection-item">
+                ${c.imageUrl ? `<img src="${escapeHtml(c.imageUrl)}" alt="" />` : ""}
+                <span><strong>${escapeHtml(c.name)}</strong>${c.keyAttribute ? `<span class="hint">${escapeHtml(c.keyAttribute)}</span>` : ""}</span>
+              </a>`,
+            )
+            .join("")}
+        </div>
+        <p class="hint">Product details come from the catalog. Add what only you know: what you have now, how you'll use it, and the price you've been offered.</p>
+      </div>`
+    : "";
+  const defaultTitle = post?.title ?? (singleCatalog ? `${singleCatalog.name} — worth it?` : catalogProducts.length >= 2 ? comparisonTitle(catalogProducts.map((c) => c.name)) : "");
 
   // Every category's context prompts are rendered, one block per category,
   // and app.js shows only the block matching the selected <select> value —
@@ -699,9 +877,11 @@ export function createEditPostPage(
   <h1>${isEdit ? "Edit your post" : "What are you thinking about buying?"}</h1>
   <p class="muted">Keep it quick — a title, a photo or two, and why you're considering it.</p>
   ${flashBanner(error)}
+  ${catalogBanner}
 
   <form method="post" action="${action}" enctype="multipart/form-data" class="form-stack post-form" data-post-mode="${postMode}">
     <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+    ${singleCatalog ? `<input type="hidden" name="catalog_product_id" value="${escapeHtml(singleCatalog.id)}" />` : ""}
 
     ${!isEdit
       ? `<fieldset class="mode-fieldset">
@@ -712,13 +892,13 @@ export function createEditPostPage(
       : `<input type="hidden" name="mode" value="${postMode}" />`}
 
     <label>${postMode === "WHICH_ONE" ? "Purchasing question" : "Product title"}
-      <input type="text" name="title" required maxlength="120" value="${escapeHtml(post?.title ?? "")}" placeholder="${postMode === "WHICH_ONE" ? "e.g. Which sleeping bag for a cold NZ hike?" : "e.g. Mac mini M4 Pro for local AI dev"}" />
+      <input type="text" name="title" required maxlength="120" value="${escapeHtml(defaultTitle)}" placeholder="${postMode === "WHICH_ONE" ? "e.g. Which sleeping bag for a cold NZ hike?" : "e.g. Mac mini M4 Pro for local AI dev"}" />
     </label>
 
     <label>Category
       <select name="category" required id="category-select">
-        <option value="" disabled ${!post && !mode.preselectedCategoryId ? "selected" : ""}>Choose a category…</option>
-        ${categoryOptions(categories, post?.categoryId ?? mode.preselectedCategoryId)}
+        <option value="" disabled ${!preselectedCategory ? "selected" : ""}>Choose a category…</option>
+        ${categoryOptions(categories, preselectedCategory)}
       </select>
     </label>
 
@@ -729,7 +909,7 @@ export function createEditPostPage(
 
     <div class="single-product-fields"${postMode === "WHICH_ONE" ? " hidden" : ""}>
       <div class="field-group">
-        <span class="field-group-label">Photos (1–4)</span>
+        <span class="field-group-label">${singleCatalog ? "Your own photos (optional — the catalog photo is used otherwise)" : "Photos (1–4)"}</span>
         <label class="file-drop file-drop-multi" data-file-drop-multi>
           <input type="file" name="images" accept="image/*" multiple capture="environment" class="file-drop-input" />
           <span class="file-drop-visual">
@@ -745,7 +925,7 @@ export function createEditPostPage(
         : ""}
 
       <div class="form-row">
-        <label>Price (optional)
+        <label>${singleCatalog ? "Price you've been offered (optional)" : "Price (optional)"}
           <input type="number" name="price" min="0" step="0.01" value="${post?.priceCents !== null && post?.priceCents !== undefined ? (post.priceCents / 100).toFixed(2) : ""}" placeholder="0.00" />
         </label>
         <label>Currency

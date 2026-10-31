@@ -551,7 +551,78 @@ function initMobileNav() {
   });
 }
 
+// Compare tray: select 2-4 catalog products across product pages, then
+// start a Which One? question. Selection is a per-tab convenience only
+// (sessionStorage, wrapped so a blocked storage just disables it); the
+// server re-validates every id when the comparison form is opened.
+function initCompareTray() {
+  const toggles = document.querySelectorAll("[data-compare-toggle]");
+  if (toggles.length === 0) return;
+  const KEY = "bop-compare";
+  const MAX = 4;
+  const read = () => {
+    try {
+      const v = JSON.parse(sessionStorage.getItem(KEY) || "[]");
+      return Array.isArray(v) ? v.filter((x) => x && typeof x.id === "string").slice(0, MAX) : [];
+    } catch {
+      return [];
+    }
+  };
+  const write = (items) => {
+    try {
+      sessionStorage.setItem(KEY, JSON.stringify(items));
+    } catch {
+      /* storage unavailable — selection just won't persist */
+    }
+  };
+
+  const tray = document.createElement("div");
+  tray.className = "compare-tray";
+  tray.setAttribute("role", "region");
+  tray.setAttribute("aria-label", "Products selected for comparison");
+  tray.hidden = true;
+  tray.innerHTML = '<span class="compare-tray-text"></span><button type="button" class="btn btn-ghost btn-small" data-compare-clear>Clear</button><a class="btn btn-brand btn-small" data-compare-go>Compare</a>';
+  document.body.appendChild(tray);
+  const text = tray.querySelector(".compare-tray-text");
+  const go = tray.querySelector("[data-compare-go]");
+
+  const render = () => {
+    const items = read();
+    toggles.forEach((btn) => {
+      const on = items.some((i) => i.id === btn.dataset.productId);
+      btn.classList.toggle("is-selected", on);
+      btn.textContent = on ? "✓ In comparison" : "+ Add to comparison";
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    tray.hidden = items.length === 0;
+    text.textContent = items.length === 1
+      ? `1 selected — add at least one more product to compare`
+      : `${items.length} selected: ${items.map((i) => i.name).join(", ")}`;
+    go.href = `/posts/new?compare=${items.map((i) => encodeURIComponent(i.id)).join(",")}`;
+    go.toggleAttribute("aria-disabled", items.length < 2);
+    go.style.pointerEvents = items.length < 2 ? "none" : "";
+    go.style.opacity = items.length < 2 ? "0.5" : "";
+  };
+
+  toggles.forEach((btn) =>
+    btn.addEventListener("click", () => {
+      let items = read();
+      const id = btn.dataset.productId;
+      if (items.some((i) => i.id === id)) items = items.filter((i) => i.id !== id);
+      else if (items.length < MAX) items.push({ id, name: btn.dataset.productName || id });
+      write(items);
+      render();
+    }),
+  );
+  tray.querySelector("[data-compare-clear]").addEventListener("click", () => {
+    write([]);
+    render();
+  });
+  render();
+}
+
 initPostDetail();
+initCompareTray();
 initAdmin();
 initGallery();
 initCurrencyUppercase();

@@ -107,9 +107,24 @@ import {
   type ActivityFeedItem,
   type DiscoverFeedItem,
   type DiscoverReferenceItem,
-  type DiscoverSource,
+  productDetailPage,
+  showcasePage,
+  creditsPage,
+  type CatalogFormProduct,
 } from "./pages.ts";
 import { EXTERNAL_REFERENCES, type ExternalReference } from "./external-references.ts";
+import {
+  getCatalogProduct,
+  getCatalogProductAttributes,
+  getCatalogProductImage,
+  getCatalogProducts,
+  getCatalogSource,
+  listCatalog,
+  listCatalogSources,
+  listQuestionsForProduct,
+  syncCatalogFromManifest,
+  type CatalogProduct,
+} from "./catalog.ts";
 import { recommendationService } from "./recommendation/chronological.ts";
 import { addLogClient, addPostClient, broadcastToPost, sseClientCounts, startHeartbeat } from "./sse.ts";
 import {
@@ -312,16 +327,22 @@ function toDiscoverItem(post: ReturnType<typeof getPostById>): DiscoverFeedItem 
   // total, rather than always rendering as an imageless, "No opinions yet"
   // card regardless of how much real community activity it actually has.
   let coverImageId: string | null = imageIds[0] ?? null;
+  let coverImageUrl: string | null = !coverImageId && p.catalogProductId ? getCatalogProductImage(p.catalogProductId)?.filePath ?? null : null;
   let comparisonOpinionCount: number | undefined;
   if (p.mode === "WHICH_ONE") {
     const options = getPurchaseOptionsForPost(p.id);
     coverImageId = options.find((o) => o.imageId)?.imageId ?? null;
+    if (!coverImageId) {
+      const catalogOption = options.find((o) => o.catalogProductId);
+      coverImageUrl = catalogOption ? getCatalogProductImage(catalogOption.catalogProductId!)?.filePath ?? null : null;
+    }
     const optionCounts = getOptionCounts(p.id);
     comparisonOpinionCount = Object.values(optionCounts.counts).reduce((a, b) => a + b, 0) + optionCounts.noneCount;
   }
   return {
     post: p,
     coverImageId,
+    coverImageUrl,
     authorHandle: author.handle,
     authorDisplayName: author.displayName,
     categoryName: category.name,
@@ -355,6 +376,11 @@ async function handle(ctx: RequestContext): Promise<void> {
   // ---- discover ----
   if (method === "GET" && path === "/discover") return handleDiscover(ctx);
   if (method === "GET" && path === "/discover/demo") return handleDemoFeed(ctx);
+  if (method === "GET" && path === "/showcase") return handleShowcase(ctx, "demo");
+  if (method === "GET" && path === "/showcase/references") return handleShowcase(ctx, "references");
+  if (method === "GET" && path === "/credits") return handleCredits(ctx);
+  const productMatch = path.match(/^\/products\/([a-z0-9-]{1,80})$/);
+  if (method === "GET" && productMatch) return handleProductDetail(ctx, productMatch[1]);
 
   // ---- posts ----
   if (method === "GET" && path === "/posts/new") return handleNewPostForm(ctx);
@@ -407,13 +433,15 @@ async function handle(ctx: RequestContext): Promise<void> {
 function handleLanding(ctx: RequestContext): void {
   const { posts } = listFeed({ limit: 6 });
   const featured = posts.map(toDiscoverItem);
-  // When there are no real posts yet, the honest thing to show a visitor is
-  // that fact plus a few labelled demo scenarios as a preview of the
-  // format — never silently filling the real feed section with demo posts
-  // unlabelled, which would let synthetic content pass as real community
-  // activity (see Feature D's is_demo separation, CLAUDE.md rule 26).
-  const demoPreview = featured.length === 0 ? getDemoFeed(4).map(toDiscoverItem) : [];
-  sendHtml(ctx.res, 200, landingPage(viewerContextOf(ctx), featured, demoPreview));
+  // Real catalog products lead the page; demo scenarios are not shown here
+  // (they live in the /showcase archive). A small, deterministic spread across categories: the first catalog item
+  // of each category, never a "trending" claim.
+  const seenCategories = new Set<string>();
+  const featuredProducts = listCatalog({ pageSize: 60 })
+    .cards.filter((c) => (seenCategories.has(c.product.categoryId) ? false : (seenCategories.add(c.product.categoryId), true)))
+    .slice(0, 8)
+    .map((c) => ({ product: c.product, image: c.image, categoryName: getCategoryById(c.product.categoryId)?.name ?? c.product.categoryId, questionCount: c.questionCount }));
+  sendHtml(ctx.res, 200, landingPage(viewerContextOf(ctx), featured, featuredProducts));
 }
 
 function handleReadme(ctx: RequestContext): void {
@@ -551,8 +579,6 @@ function handleLogout(ctx: RequestContext): void {
 
 // ------------------------------------------------------------ discover ----
 
-const VALID_SOURCES = new Set(["all", "community", "demo", "references"]);
-
 function referenceImageUrl(ref: ExternalReference): string | null {
   if (!ref.imageKey) return null;
   return `/static/assets/references/${ref.imageKey}.jpg`;
@@ -567,90 +593,100 @@ function toDiscoverReferenceItem(ref: ExternalReference): DiscoverReferenceItem 
 }
 
 /**
- * References are a small (~8 entry), hand-curated, code-level list — never a
- * posts-table row (see src/external-references.ts's own header comment for
- * why) — so this is a plain in-memory filter, not a database query. No
- * pagination: the whole filtered set renders on one page, same as the demo
- * feed's own "a showcase never needs real pagination" reasoning.
- */
-function filterReferences(categoryId: string | undefined, search: string | undefined): DiscoverReferenceItem[] {
-  const matches = search ? EXTERNAL_REFERENCES.filter((r) => !categoryId || r.categoryId === categoryId).filter((r) => {
-    const q = search.toLowerCase();
-    return r.title.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q);
-  }) : EXTERNAL_REFERENCES.filter((r) => !categoryId || r.categoryId === categoryId);
-  return matches.map(toDiscoverReferenceItem);
-}
-
-/**
- * A single unified Discover with four content-source views: All questions,
- * Community, Demo examples, and Real-world examples (brief: "make Discover a
- * unified browsing experience"). /discover/demo (handleDemoFeed below) now
- * just redirects here with ?source=demo instead of running its own separate
- * query/page — one code path for "which posts are eligible," not two that
- * could drift apart. An invalid or missing ?source always falls back to
- * "all" (never silently to "community", which would hide the one thing a
- * brand-new, empty-real-feed visitor most needs to see).
- *
- * "references" is handled in its own early branch rather than threaded
- * through FeedSource/listFeed/listMostDiscussed — a reference is never a row
- * in `posts`, so it was never eligible for those queries to begin with (see
- * src/external-references.ts).
+ * Discover: real catalog products (default) or real community questions.
+ * Demo scenarios and external references are not part of either view —
+ * they live in the /showcase archive. Old ?source= links are forwarded so
+ * nothing bookmarked breaks: demo and references go to their archive
+ * sections, community/all go to the Questions view.
  */
 function handleDiscover(ctx: RequestContext): void {
-  const categoryId = ctx.url.searchParams.get("category") ?? undefined;
-  const search = ctx.url.searchParams.get("q")?.trim() || undefined;
-  const cursor = ctx.url.searchParams.get("cursor") ?? undefined;
-  const sort = ctx.url.searchParams.get("sort") === "discussed" ? "discussed" : "recent";
-  const rawSource = ctx.url.searchParams.get("source") ?? "all";
-  const source: DiscoverSource = VALID_SOURCES.has(rawSource) ? (rawSource as DiscoverSource) : "all";
-  const filters = { categoryId, search, sort: sort as "recent" | "discussed", source };
+  const params = ctx.url.searchParams;
+  const legacySource = params.get("source");
+  if (legacySource === "demo") return redirect(ctx.res, "/showcase");
+  if (legacySource === "references") return redirect(ctx.res, "/showcase/references");
+  if (legacySource === "community" || legacySource === "all") {
+    const qs = new URLSearchParams(params);
+    qs.delete("source");
+    qs.set("view", "questions");
+    return redirect(ctx.res, `/discover?${qs.toString()}`);
+  }
 
-  if (source === "references") {
-    const referenceItems = filterReferences(categoryId, search);
-    sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), [], listCategories(), filters, null, referenceItems));
+  const view = params.get("view") === "questions" ? "questions" : "products";
+  const rawCategory = params.get("category") ?? undefined;
+  const categoryId = rawCategory && getCategoryById(rawCategory) ? rawCategory : undefined;
+  const search = params.get("q")?.trim().slice(0, 100) || undefined;
+  const categories = listCategories();
+
+  if (view === "products") {
+    const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
+    const result = listCatalog({ categoryId, search, page, pageSize: 24 });
+    const products = result.cards.map((c) => ({
+      product: c.product,
+      image: c.image,
+      categoryName: getCategoryById(c.product.categoryId)?.name ?? c.product.categoryId,
+      questionCount: c.questionCount,
+    }));
+    sendHtml(
+      ctx.res,
+      200,
+      discoverPage(viewerContextOf(ctx), categories, { view, categoryId, search, page: result.page }, { products, productTotal: result.total, totalPages: result.totalPages }),
+    );
     return;
   }
 
-  // "Most discussed" is a single bounded highlights page (no pagination, no
-  // category/search combination) — see listMostDiscussed's own comment for
-  // why. Its eligibility now respects the chosen source the same way the
-  // chronological view does — a demo post's opinion count is still its own
-  // real count, never blended into a real post's rank (see listMostDiscussed's
-  // own comment).
+  // Questions view: real community posts only (source "community" pins
+  // is_demo = 0 in both queries). Demo scenarios are never mixed in here.
+  const sort = params.get("sort") === "discussed" ? "discussed" : "recent";
+  const cursor = params.get("cursor") ?? undefined;
+  const filters = { view, categoryId, search, sort } as const;
   if (sort === "discussed" && !categoryId && !search) {
-    const items = listMostDiscussed(20, source).map((post) => toDiscoverItem(post));
-    sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), filters, null));
+    const questions = listMostDiscussed(20, "community").map((post) => toDiscoverItem(post));
+    sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), categories, filters, { questions, nextCursor: null }));
     return;
   }
-
-  // recommendationService's interest-boosted personalization is specifically
-  // about real community posts matching a user's declared interests (see
-  // ChronologicalRecommendationService) — it's never extended to cover demo
-  // content, so it's only used for the plain, unfiltered "community" view
-  // exactly as before. Every other combination (an explicit category/search,
-  // or source=all/demo) goes through the same plain chronological listFeed,
-  // just with its is_demo clause now driven by `source` instead of always
-  // being hardcoded to "real only."
   const result =
-    categoryId || search || source !== "community"
-      ? listFeed({ categoryId, search, cursor, limit: 20, source })
+    categoryId || search
+      ? listFeed({ categoryId, search, cursor, limit: 20, source: "community" })
       : recommendationService.getFeedForUser(ctx.auth?.user.id ?? null, { cursor, limit: 20 });
-
-  const items = result.posts.map(toDiscoverItem);
-  sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), filters, result.nextCursor));
+  sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), categories, filters, { questions: result.posts.map(toDiscoverItem), nextCursor: result.nextCursor }));
 }
 
-/**
- * /discover/demo is kept as a working, bookmarkable URL (nothing that could
- * already be linked or bookmarked should 404), but now just forwards into
- * the unified Discover with the demo source selected, rather than running
- * its own separate getDemoFeed query and demoFeedPage template — see
- * handleDiscover's own comment for why there's only one query path now.
- */
+/** Legacy URL: the demo feed moved to the showcase archive. */
 function handleDemoFeed(ctx: RequestContext): void {
-  const qs = new URLSearchParams(ctx.url.search);
-  qs.set("source", "demo");
-  redirect(ctx.res, `/discover?${qs.toString()}`);
+  redirect(ctx.res, "/showcase");
+}
+
+function handleShowcase(ctx: RequestContext, section: "demo" | "references"): void {
+  if (section === "demo") {
+    const demoItems = getDemoFeed(30).map(toDiscoverItem);
+    sendHtml(ctx.res, 200, showcasePage(viewerContextOf(ctx), "demo", { demoItems }));
+    return;
+  }
+  sendHtml(ctx.res, 200, showcasePage(viewerContextOf(ctx), "references", { referenceItems: EXTERNAL_REFERENCES.map(toDiscoverReferenceItem) }));
+}
+
+function handleProductDetail(ctx: RequestContext, productId: string): void {
+  const product = getCatalogProduct(productId);
+  if (!product) throw new HttpError(404, "product not found");
+  const category = getCategoryById(product.categoryId)!;
+  sendHtml(
+    ctx.res,
+    200,
+    productDetailPage(viewerContextOf(ctx), {
+      product,
+      image: getCatalogProductImage(product.id),
+      attributes: getCatalogProductAttributes(product.id),
+      category,
+      source: getCatalogSource(product.sourceId),
+      questions: listQuestionsForProduct(product.id).map(toDiscoverItem),
+    }),
+  );
+}
+
+function handleCredits(ctx: RequestContext): void {
+  const sources = listCatalogSources();
+  const total = listCatalog({ pageSize: 1 }).total;
+  sendHtml(ctx.res, 200, creditsPage(viewerContextOf(ctx), sources, total));
 }
 
 // ---------------------------------------------------------------- posts ---
@@ -664,7 +700,22 @@ function handleNewPostForm(ctx: RequestContext): void {
   const rawCategory = ctx.url.searchParams.get("category") ?? undefined;
   const categories = listCategories();
   const preselectedCategoryId = rawCategory && categories.some((c) => c.id === rawCategory) ? rawCategory : undefined;
-  sendHtml(ctx.res, 200, createEditPostPage(viewerContextOf(ctx), categories, null, { kind: "create", preselectedCategoryId }));
+  // ?product=<id> (Buy or Pass about one catalog product) or
+  // ?compare=<id>,<id>[,…] (Which One? across 2-4). Unknown ids are simply
+  // dropped — only real catalog rows ever reach the form.
+  const productParam = ctx.url.searchParams.get("product");
+  const compareParam = ctx.url.searchParams.get("compare");
+  const requestedIds = compareParam
+    ? [...new Set(compareParam.split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 4)
+    : productParam
+    ? [productParam]
+    : [];
+  const catalogProducts = getCatalogProducts(requestedIds).map(toCatalogFormProduct);
+  sendHtml(ctx.res, 200, createEditPostPage(viewerContextOf(ctx), categories, null, { kind: "create", preselectedCategoryId, catalogProducts }));
+}
+
+function toCatalogFormProduct(p: CatalogProduct): CatalogFormProduct {
+  return { id: p.id, name: p.name, categoryId: p.categoryId, imageUrl: getCatalogProductImage(p.id)?.filePath ?? null, brand: p.brand, keyAttribute: p.keyAttribute };
 }
 
 function parsePrice(raw: unknown): number | null {
@@ -683,6 +734,7 @@ function parseOptionInputsFromFields(fields: Record<string, any>): Array<{
   condition: unknown;
   sourceUrl: unknown;
   saleNote: unknown;
+  catalogProductId: string | null;
 }> {
   // Scans past the UI's own 4-option cap (up to 10) so a direct API call
   // that sends a 5th+ option is actually counted and rejected by
@@ -702,6 +754,7 @@ function parseOptionInputsFromFields(fields: Record<string, any>): Array<{
       condition: fields[`option_condition_${i}`] || null,
       sourceUrl: fields[`option_source_url_${i}`] || null,
       saleNote: fields[`option_sale_note_${i}`] || null,
+      catalogProductId: typeof fields[`option_catalog_product_id_${i}`] === "string" ? fields[`option_catalog_product_id_${i}`] : null,
     });
   }
   return options;
@@ -749,7 +802,10 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
     } as const;
     const postValidation = validatePostInput(input);
     const contextValidation = validateContextAnswers(categoryId, null, contextAnswers, freeText);
-    const allErrors = [...postValidation.errors, ...countCheck.errors, ...optionErrors, ...contextValidation.errors];
+    const catalogErrors = rawOptions.flatMap((o, i) =>
+      o.catalogProductId && !getCatalogProduct(o.catalogProductId) ? [`option ${i + 1} refers to a product that isn't in the catalog`] : [],
+    );
+    const allErrors = [...postValidation.errors, ...countCheck.errors, ...optionErrors, ...contextValidation.errors, ...catalogErrors];
     if (allErrors.length > 0) return rerenderError(allErrors.join(" "));
 
     const optionImageFiles = body.files.filter((f) => f.fieldname.startsWith("option_image_"));
@@ -778,6 +834,7 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
       condition: o.condition as string | null,
       sourceUrl: o.sourceUrl as string | null,
       saleNote: o.saleNote as string | null,
+      catalogProductId: o.catalogProductId,
     }));
     setPurchaseOptions(post.id, newOptions);
     if (Object.keys(contextAnswers).length > 0 || freeText) {
@@ -803,11 +860,16 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
   const validation = validatePostInput(input);
   const contextValidation = validateContextAnswers(categoryId, null, contextAnswers, freeText);
   validation.errors.push(...contextValidation.errors);
+  const rawCatalogId = typeof body.fields.catalog_product_id === "string" ? body.fields.catalog_product_id.trim() : "";
+  const catalogProduct = rawCatalogId ? getCatalogProduct(rawCatalogId) : undefined;
+  if (rawCatalogId && !catalogProduct) validation.errors.push("that product isn't in the catalog");
   const imageFiles = body.files.filter((f) => f.fieldname === "images");
-  if (imageFiles.length === 0) validation.errors.push("at least one photo is required");
+  // A question about a catalog product already has a real, licensed product
+  // photo; the buyer's own photos become optional, not required.
+  if (imageFiles.length === 0 && !catalogProduct) validation.errors.push("at least one photo is required");
   if (imageFiles.length > 4) validation.errors.push("at most 4 photos are allowed");
 
-  if (validation.errors.length > 0 || imageFiles.length === 0 || imageFiles.length > 4) {
+  if (validation.errors.length > 0) {
     return rerenderError(validation.errors.join(" "));
   }
 
@@ -819,12 +881,12 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
     return rerenderError(message);
   }
 
-  const post = createPost({ authorId: auth.user.id, ...input, mode: "BUY_PASS" }, imageIds);
+  const post = createPost({ authorId: auth.user.id, ...input, mode: "BUY_PASS", catalogProductId: catalogProduct?.id ?? null }, imageIds);
   if (Object.keys(contextAnswers).length > 0 || freeText) {
     setPostContext(post.id, CONTEXT_SCHEMA_VERSION, categoryId, contextAnswers, freeText);
   }
   indexPostForSearch(post.id, post.title, post.description, [...Object.values(contextAnswers), freeText].join(" "));
-  log(ctx, "post.created", "success", { targetType: "post", targetId: post.id });
+  log(ctx, "post.created", "success", { targetType: "post", targetId: post.id, meta: catalogProduct ? { catalogProductId: catalogProduct.id } : undefined });
   redirect(ctx.res, `/posts/${post.id}`);
 }
 
@@ -875,10 +937,20 @@ function handlePostDetail(ctx: RequestContext, postId: string): void {
         context,
         contextPrompts,
         relatedPosts,
+        catalogProduct: post.catalogProductId ? catalogSummary(post.catalogProductId) : null,
+        optionCatalogImages: Object.fromEntries(
+          options.filter((o) => o.catalogProductId).map((o) => [o.id, getCatalogProductImage(o.catalogProductId!)?.filePath ?? null]),
+        ),
       },
       { message: ctx.url.searchParams.get("msg"), kind: (ctx.url.searchParams.get("kind") as "error" | "success") ?? "error" },
     ),
   );
+}
+
+function catalogSummary(productId: string): { id: string; name: string; brand: string | null; imageUrl: string | null } | null {
+  const product = getCatalogProduct(productId);
+  if (!product) return null;
+  return { id: product.id, name: product.name, brand: product.brand, imageUrl: getCatalogProductImage(product.id)?.filePath ?? null };
 }
 
 function handleEditPostForm(ctx: RequestContext, postId: string): void {
@@ -957,7 +1029,10 @@ async function handleUpdatePost(ctx: RequestContext, postId: string): Promise<vo
       visibility: body.fields.visibility === "unlisted" ? "unlisted" : "public",
     } as const;
     const postValidation = validatePostInput(input);
-    const allErrors = [...postValidation.errors, ...countCheck.errors, ...optionErrors, ...contextValidation.errors];
+    const catalogErrors = rawOptions.flatMap((o, i) =>
+      o.catalogProductId && !getCatalogProduct(o.catalogProductId) ? [`option ${i + 1} refers to a product that isn't in the catalog`] : [],
+    );
+    const allErrors = [...postValidation.errors, ...countCheck.errors, ...optionErrors, ...contextValidation.errors, ...catalogErrors];
     if (allErrors.length > 0) return rerenderEditError(allErrors.join(" "));
 
     const existingOptions = getPurchaseOptionsForPost(postId);
@@ -984,6 +1059,7 @@ async function handleUpdatePost(ctx: RequestContext, postId: string): Promise<vo
       condition: o.condition as string | null,
       sourceUrl: o.sourceUrl as string | null,
       saleNote: o.saleNote as string | null,
+      catalogProductId: o.catalogProductId,
     }));
     setPurchaseOptions(postId, newOptions);
     if (Object.keys(contextAnswers).length > 0 || freeText) {
@@ -1587,6 +1663,11 @@ const server = createServer(async (req, res) => {
     }
   }
 });
+
+// Idempotent upsert of the committed catalog manifest (src/catalog.ts) —
+// never deletes a catalog row and never touches user content.
+const catalogSync = syncCatalogFromManifest();
+if (catalogSync) console.log(JSON.stringify({ level: "info", message: "catalog synced", ...catalogSync }));
 
 startHeartbeat();
 setInterval(() => {

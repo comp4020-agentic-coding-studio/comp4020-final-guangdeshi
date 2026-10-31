@@ -24,23 +24,17 @@ describe("demo content: admin seeding is properly gated", () => {
   });
 });
 
-// The Discover content-experience refinement folded the formerly-separate
-// "Explore Demo" page into the unified /discover with ?source=demo (see
-// handleDemoFeed in src/server.ts, now a 303 redirect rather than its own
-// page/template) — /discover/demo is kept as a working, bookmarkable URL
-// for anyone who already linked it, it just forwards into the same page
-// spec/discover.test.ts covers in depth. The tests below (still reachable
-// without login, never mixing real content into the demo view) are kept
-// here rather than deleted, since they're specifically about that legacy
-// URL's compatibility and the is_demo isolation it was always there to
-// prove, not about Discover's general filtering logic.
-describe("demo content: the public demo-examples surface", () => {
-  it("/discover/demo is reachable without logging in and lands on the demo view", async () => {
+// Demo scenarios moved out of Discover into the /showcase archive (the
+// product catalog redesign). /discover/demo and ?source=demo forward there.
+// The tests below keep proving the archive is public, always labelled, and
+// never mixes real posts in.
+describe("demo content: the showcase archive", () => {
+  it("/discover/demo is reachable without logging in and lands on the labelled archive", async () => {
     const res = await fetch(new URL("/discover/demo", baseUrl()));
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("Discover");
-    expect(html).toContain("Explore fictional purchasing scenarios");
+    expect(html).toContain("Showcase archive");
+    expect(html).toContain("fictional");
   });
 
   it("never mixes a real post into the demo-only view", async () => {
@@ -50,7 +44,7 @@ describe("demo content: the public demo-examples surface", () => {
     const detail = await fetch(new URL(`/posts/${postId}`, baseUrl()));
     expect((await detail.text())).toContain("A genuinely real purchasing question XYZ999");
 
-    const demoFeed = await fetch(new URL("/discover?source=demo", baseUrl()));
+    const demoFeed = await fetch(new URL("/showcase", baseUrl()));
     const demoHtml = await demoFeed.text();
     expect(demoHtml).not.toContain("A genuinely real purchasing question XYZ999");
   });

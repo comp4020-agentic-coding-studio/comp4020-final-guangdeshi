@@ -4,6 +4,7 @@
 // stack, and every user-authored value passed through escapeHtml() at the
 // call site before it reaches here.
 import type { Category, Post, PostContext, PurchaseOption } from "./db.ts";
+import type { CatalogProduct, CatalogProductImage } from "./catalog.ts";
 import type { User } from "./db.ts";
 import type { ContextPrompt } from "./context-prompts.ts";
 import { escapeHtml } from "./validation.ts";
@@ -129,7 +130,7 @@ function renderFooter(): string {
   <div class="site-footer-inner">
     <p><strong>Buy or Pass</strong> — "You want it. What does everyone else think?"</p>
     <p class="muted">The purchase belongs to the buyer. The opinions belong to the community.</p>
-    <p class="muted"><a href="/readme/">Read our Definition of Good</a> · Built for ANU COMP8020 Agentic Coding Studio</p>
+    <p class="muted"><a href="/readme/">Read our Definition of Good</a> · <a href="/credits">Product data &amp; image credits</a> · <a href="/showcase">Showcase archive</a> · Built for ANU COMP8020 Agentic Coding Studio</p>
   </div>
 </footer>`;
 }
@@ -177,6 +178,9 @@ export function postCard(
   post: Post,
   opts: {
     coverImageId: string | null;
+    // Fallback for a question about a catalog product with no uploaded photo
+    // of its own: the product's real catalog image.
+    coverImageUrl?: string | null;
     authorHandle: string;
     authorDisplayName: string;
     categoryName: string;
@@ -203,7 +207,11 @@ export function postCard(
       ${buyPct !== null ? `<span class="stat-bar"><span class="stat-bar-fill" style="width:${buyPct}%"></span></span>` : `<span class="stat-empty">No opinions yet</span>`}`;
   return `<a href="/posts/${post.id}" class="post-card${post.isDemo ? " post-card-demo" : ""}">
   <div class="post-card-image">
-    ${opts.coverImageId ? `<img src="/images/${opts.coverImageId}" alt="" loading="lazy" />` : `<div class="post-card-image-placeholder">🛍️</div>`}
+    ${opts.coverImageId
+      ? `<img src="/images/${opts.coverImageId}" alt="" loading="lazy" />`
+      : opts.coverImageUrl
+      ? `<img src="${escapeHtml(opts.coverImageUrl)}" alt="" loading="lazy" class="post-card-image-catalog" />`
+      : `<div class="post-card-image-placeholder">🛍️</div>`}
     ${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted</span>` : ""}
     ${post.isDemo ? `<span class="post-card-tag demo-tag-overlay">🤖 Demo</span>` : ""}
     ${isComparison ? `<span class="post-card-tag comparison-tag">Which One?</span>` : ""}
@@ -312,7 +320,7 @@ export function contextCard(context: PostContext | null, prompts: ContextPrompt[
  * framing that would imply a bigger discount is automatically the better
  * decision.
  */
-export function purchaseOptionCard(option: PurchaseOption, voteCount: number, isMySelection: boolean): string {
+export function purchaseOptionCard(option: PurchaseOption, voteCount: number, isMySelection: boolean, catalogImageUrl: string | null = null): string {
   const expected = formatPrice(option.expectedPriceCents, option.currency);
   const original = option.originalPriceCents !== null ? formatPrice(option.originalPriceCents, option.currency) : null;
   const specs = option.specifications
@@ -322,8 +330,12 @@ export function purchaseOptionCard(option: PurchaseOption, voteCount: number, is
         .join("")
     : "";
   return `<div class="purchase-option-card${isMySelection ? " purchase-option-selected" : ""}" data-option-id="${option.id}">
-    ${option.imageId ? `<img src="/images/${option.imageId}" alt="" class="purchase-option-image" />` : `<div class="purchase-option-image-placeholder">🛍️</div>`}
-    <h4 class="purchase-option-name">${escapeHtml(option.name)}</h4>
+    ${option.imageId
+      ? `<img src="/images/${option.imageId}" alt="" class="purchase-option-image" />`
+      : catalogImageUrl
+      ? `<img src="${escapeHtml(catalogImageUrl)}" alt="" class="purchase-option-image purchase-option-image-catalog" />`
+      : `<div class="purchase-option-image-placeholder">🛍️</div>`}
+    <h4 class="purchase-option-name">${option.catalogProductId ? `<a href="/products/${escapeHtml(option.catalogProductId)}">${escapeHtml(option.name)}</a>` : escapeHtml(option.name)}</h4>
     <p class="purchase-option-price">
       ${expected ? escapeHtml(expected) : ""}
       ${original ? `<span class="purchase-option-original-price">${escapeHtml(original)}</span>` : ""}
@@ -334,6 +346,36 @@ export function purchaseOptionCard(option: PurchaseOption, voteCount: number, is
     ${specs ? `<ul class="purchase-option-specs">${specs}</ul>` : ""}
     <p class="purchase-option-vote-count">${voteCount} opinion${voteCount === 1 ? "" : "s"}${isMySelection ? " · your pick" : ""}</p>
   </div>`;
+}
+
+/**
+ * A real catalog product card: image-led, compact, no engagement numbers
+ * except the live count of genuine community questions linked to it (never
+ * a rating, review count or price — the catalog has none to show). The
+ * whole card links to the product page; "Ask about this" is a separate,
+ * explicit action.
+ */
+export function productCard(product: CatalogProduct, image: CatalogProductImage | null, opts: { categoryName: string; questionCount: number }): string {
+  const askHref = `/posts/new?product=${encodeURIComponent(product.id)}`;
+  const questions = opts.questionCount > 0
+    ? `<a href="/products/${escapeHtml(product.id)}#questions" class="product-card-questions">${opts.questionCount} community question${opts.questionCount === 1 ? "" : "s"}</a>`
+    : "";
+  return `<article class="product-card">
+  <a href="/products/${escapeHtml(product.id)}" class="product-card-link">
+    <div class="product-card-image">
+      ${image ? `<img src="${escapeHtml(image.filePath)}" alt="${escapeHtml(product.name)}" loading="lazy" width="${image.width}" height="${image.height}" />` : ""}
+    </div>
+    <div class="product-card-body">
+      <p class="product-card-eyebrow">${escapeHtml(opts.categoryName)}${product.brand ? ` · ${escapeHtml(product.brand)}` : ""}</p>
+      <h3 class="product-card-title">${escapeHtml(product.name)}</h3>
+      ${product.keyAttribute ? `<p class="product-card-attr">${escapeHtml(product.keyAttribute)}</p>` : ""}
+    </div>
+  </a>
+  <div class="product-card-actions">
+    ${questions}
+    <a href="${askHref}" class="btn btn-brand btn-small product-card-ask">Ask about this</a>
+  </div>
+</article>`;
 }
 
 /** Persistent banner, not a dismissible tag, per the brief's exact required wording. */
