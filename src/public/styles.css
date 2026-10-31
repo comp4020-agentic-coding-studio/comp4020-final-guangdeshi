@@ -1545,8 +1545,46 @@ textarea {
   flex-direction: column;
   gap: 0.7rem;
 }
+/* Grid items default to min-width: auto, i.e. their own content-based
+   minimum — for a <label> wrapping an <input>, that minimum ignored the
+   3fr/2fr track ratio below and rendered both tracks at roughly equal
+   width anyway (confirmed via getBoundingClientRect: 65px vs 64px, not
+   the ~87/58 a 3:2 split should have produced), clipping the price
+   placeholder exactly the way .search-form input's own min-width: 0 fix
+   already had to solve once before in this file. */
+.option-form-block .form-row > label {
+  min-width: 0;
+}
+/* minmax(0, 1fr) for price (shrinkable, takes remaining space) and a fixed
+   68px for currency (just enough for "AUD" plus padding/border at this
+   font size, confirmed by filling the field and screenshotting it — an
+   earlier 3fr/2fr attempt still rendered the real value "AUD" clipped to
+   "AU…" because a fr-based split only changes the *ratio*, not whether
+   either track is actually wide enough for its own content). */
 .option-form-block .form-row {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) 68px;
+}
+/* The option card's own two-column inner layout (photo + fields) leaves
+   barely 150px for the price/currency pair — the global input padding
+   (0.9em each side) is fine everywhere else but visibly crowds a 4-char
+   "0.00" placeholder here, so it's tightened specifically in this
+   context rather than globally. Chromium's native number-input spinner
+   arrows eat further into that already-narrow box independent of padding
+   (confirmed directly: padding alone left "0.00" still clipped to
+   "0.0…" in a screenshot) — hidden here only, since type="number" is
+   kept for its real keyboard/validation behavior, just not its spinner
+   chrome, in this one width-constrained spot. */
+.option-form-block .form-row input {
+  padding-left: 0.6em;
+  padding-right: 0.5em;
+}
+.option-form-block .form-row input[type="number"]::-webkit-inner-spin-button,
+.option-form-block .form-row input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.option-form-block .form-row input[type="number"] {
+  -moz-appearance: textfield;
 }
 .option-more-details summary {
   cursor: pointer;
