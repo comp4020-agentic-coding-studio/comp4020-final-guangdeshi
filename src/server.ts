@@ -79,6 +79,7 @@ import {
   upsertOpinion,
   upsertOutcome,
   type ComparisonSelection,
+  type FeedSource,
   type NewPurchaseOption,
   type Post,
   type PostMode,
@@ -94,7 +95,6 @@ import { renderMarkdown, renderReadmePage } from "./markdown.ts";
 import {
   adminPage,
   createEditPostPage,
-  demoFeedPage,
   discoverPage,
   errorPage,
   landingPage,
@@ -546,39 +546,66 @@ function handleLogout(ctx: RequestContext): void {
 
 // ------------------------------------------------------------ discover ----
 
+const VALID_SOURCES = new Set(["all", "community", "demo"]);
+
+/**
+ * A single unified Discover with three content-source views (brief: "make
+ * Discover a unified browsing experience"). /discover/demo (handleDemoFeed
+ * below) now just redirects here with ?source=demo instead of running its
+ * own separate query/page — one code path for "which posts are eligible,"
+ * not two that could drift apart. An invalid or missing ?source always
+ * falls back to "all" (never silently to "community", which would hide the
+ * one thing a brand-new, empty-real-feed visitor most needs to see).
+ */
 function handleDiscover(ctx: RequestContext): void {
   const categoryId = ctx.url.searchParams.get("category") ?? undefined;
   const search = ctx.url.searchParams.get("q")?.trim() || undefined;
   const cursor = ctx.url.searchParams.get("cursor") ?? undefined;
   const sort = ctx.url.searchParams.get("sort") === "discussed" ? "discussed" : "recent";
+  const rawSource = ctx.url.searchParams.get("source") ?? "all";
+  const source: FeedSource = VALID_SOURCES.has(rawSource) ? (rawSource as FeedSource) : "all";
+  const filters = { categoryId, search, sort: sort as "recent" | "discussed", source };
 
   // "Most discussed" is a single bounded highlights page (no pagination, no
   // category/search combination) — see listMostDiscussed's own comment for
-  // why. An explicit category or search filter otherwise always uses the
-  // plain chronological query; recommendationService (interest-boosted)
-  // only applies to the unfiltered default view, so a user's own filter
-  // choice is never silently overridden by a "personalized" ordering.
+  // why. Its eligibility now respects the chosen source the same way the
+  // chronological view does — a demo post's opinion count is still its own
+  // real count, never blended into a real post's rank (see listMostDiscussed's
+  // own comment).
   if (sort === "discussed" && !categoryId && !search) {
-    const items = listMostDiscussed(20).map((post) => toDiscoverItem(post));
-    sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), { sort: "discussed" }, null));
+    const items = listMostDiscussed(20, source).map((post) => toDiscoverItem(post));
+    sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), filters, null));
     return;
   }
 
-  const result = categoryId || search
-    ? listFeed({ categoryId, search, cursor, limit: 20 })
-    : recommendationService.getFeedForUser(ctx.auth?.user.id ?? null, { cursor, limit: 20 });
+  // recommendationService's interest-boosted personalization is specifically
+  // about real community posts matching a user's declared interests (see
+  // ChronologicalRecommendationService) — it's never extended to cover demo
+  // content, so it's only used for the plain, unfiltered "community" view
+  // exactly as before. Every other combination (an explicit category/search,
+  // or source=all/demo) goes through the same plain chronological listFeed,
+  // just with its is_demo clause now driven by `source` instead of always
+  // being hardcoded to "real only."
+  const result =
+    categoryId || search || source !== "community"
+      ? listFeed({ categoryId, search, cursor, limit: 20, source })
+      : recommendationService.getFeedForUser(ctx.auth?.user.id ?? null, { cursor, limit: 20 });
 
   const items = result.posts.map(toDiscoverItem);
-  sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), { categoryId, search, sort: "recent" }, result.nextCursor));
+  sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), items, listCategories(), filters, result.nextCursor));
 }
 
 /**
- * Feature D's "Explore Demo" section — readable by anyone, no auth check,
- * per the brief's "allow visitors to read demo cases without registration."
+ * /discover/demo is kept as a working, bookmarkable URL (nothing that could
+ * already be linked or bookmarked should 404), but now just forwards into
+ * the unified Discover with the demo source selected, rather than running
+ * its own separate getDemoFeed query and demoFeedPage template — see
+ * handleDiscover's own comment for why there's only one query path now.
  */
 function handleDemoFeed(ctx: RequestContext): void {
-  const items = getDemoFeed(30).map(toDiscoverItem);
-  sendHtml(ctx.res, 200, demoFeedPage(viewerContextOf(ctx), items));
+  const qs = new URLSearchParams(ctx.url.search);
+  qs.set("source", "demo");
+  redirect(ctx.res, `/discover?${qs.toString()}`);
 }
 
 // ---------------------------------------------------------------- posts ---

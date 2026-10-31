@@ -409,11 +409,22 @@ export function getPostImageIds(postId: string): string[] {
   ).map((r) => r.image_id);
 }
 
+export type FeedSource = "all" | "community" | "demo";
+
 export interface FeedQuery {
   categoryId?: string;
   search?: string;
   cursor?: string; // `${created_at}|${id}` of the last item on the previous page
   limit?: number;
+  // "community" (default) = real posts only, matching every pre-v2 caller's
+  // existing behavior unchanged. "demo" = fictional scenarios only (what
+  // getDemoFeed below used to be the only way to get). "all" mixes both,
+  // ordered purely by created_at — never a fabricated "freshness" score —
+  // so a demo post is never implied to be newer human activity than it
+  // actually is. The is_demo distinction in the database is never erased:
+  // every row returned still carries its own real isDemo flag for the
+  // template to label honestly (see postCard's demo-tag-overlay).
+  source?: FeedSource;
 }
 
 export interface FeedPage {
@@ -423,11 +434,13 @@ export interface FeedPage {
 
 export function listFeed(query: FeedQuery): FeedPage {
   const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-  // Demo content lives in its own /discover/demo feed (getDemoFeed below),
-  // never mixed into the real Discover feed — a visitor should never
-  // mistake a fictional scenario for genuine community activity.
-  const clauses = ["status = 'active'", "visibility = 'public'", "is_demo = 0"];
+  const clauses = ["status = 'active'", "visibility = 'public'"];
   const params: any[] = [];
+
+  const source = query.source ?? "community";
+  if (source === "community") clauses.push("is_demo = 0");
+  else if (source === "demo") clauses.push("is_demo = 1");
+  // source === "all": no is_demo clause at all, so both kinds match.
 
   if (query.categoryId) {
     clauses.push("category_id = ?");
@@ -460,13 +473,23 @@ export function listFeed(query: FeedQuery): FeedPage {
  * full keyset-paginated feed listFeed() provides — "most discussed" is a
  * highlights view, not something users are expected to page deeply through;
  * documented as a known scope limit rather than silently assumed away.
+ *
+ * `source` controls which posts are even eligible to appear (default
+ * "community", matching every pre-v2 caller unchanged) — it never changes
+ * how a count is computed. A demo post's opinion_count here is its own
+ * real seeded-opinion row count (same COUNT(*) a real post gets), not a
+ * fabricated number, and a demo post's count can never add to or inflate a
+ * real post's count since they're always counted per-row by the GROUP BY.
  */
-export function listMostDiscussed(limit = 20): (Post & { opinionCount: number })[] {
+export function listMostDiscussed(limit = 20, source: FeedSource = "community"): (Post & { opinionCount: number })[] {
+  const clauses = ["p.status = 'active'", "p.visibility = 'public'"];
+  if (source === "community") clauses.push("p.is_demo = 0");
+  else if (source === "demo") clauses.push("p.is_demo = 1");
   const rows = db
     .prepare(
       `SELECT p.*, COUNT(o.id) AS opinion_count
        FROM posts p LEFT JOIN opinions o ON o.post_id = p.id
-       WHERE p.status = 'active' AND p.visibility = 'public' AND p.is_demo = 0
+       WHERE ${clauses.join(" AND ")}
        GROUP BY p.id
        ORDER BY opinion_count DESC, p.created_at DESC
        LIMIT ?`,

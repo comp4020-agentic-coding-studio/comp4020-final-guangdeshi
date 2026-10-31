@@ -635,10 +635,44 @@ summary:focus-visible,
      actually available next to the Search button. */
   min-width: 0;
 }
+/* Three content-source views (All questions / Community / Demo examples),
+   deliberately styled as real tabs (underline + aria-current), distinct
+   from the pill-shaped category filter directly below it — two different
+   kinds of filter (which posts are even eligible vs. which category) read
+   as visually different controls rather than one long row of identical
+   pills a visitor has to parse to tell apart. */
+.source-tabs {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.source-tab {
+  text-decoration: none;
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 0.8em 0.1em;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.source-tab-active {
+  color: var(--color-brand-dark);
+  border-bottom-color: var(--color-brand);
+}
+.discover-intro {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 1rem 1.5rem 0;
+  color: var(--color-ink-muted);
+  font-size: 0.92rem;
+}
 .category-pills {
   max-width: var(--container-width);
   margin: 0 auto;
-  padding: 0 1.5rem 1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
   display: flex;
   gap: 0.6rem;
   overflow-x: auto;
@@ -1462,6 +1496,16 @@ textarea {
   color: var(--color-ink-muted);
   margin-bottom: 1.5em;
 }
+/* Discover's per-source/category empty state offers real, specific ways
+   out (reset the category, look at demo examples) rather than a single
+   generic action — a huge blank page with nothing but an icon is exactly
+   what this replaces. */
+.empty-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  margin-bottom: 1.2em;
+}
 
 /* ===========================================================================
    Buy or Pass v2.0 — Adaptive Context, Which One? comparison mode, demo
@@ -1886,10 +1930,6 @@ textarea {
   font-weight: 600;
   font-size: 0.85rem;
 }
-.demo-feed-header p {
-  max-width: 640px;
-}
-
 /* ------------------------------------------------------ related decisions */
 
 .related-section {
@@ -2005,9 +2045,21 @@ textarea {
     flex-direction: column;
     align-items: stretch;
   }
-  .section, .post-detail, .discover-header, .category-pills, .profile-header, .profile-edit-details {
+  .section, .post-detail, .discover-header, .category-pills, .source-tabs, .profile-header, .profile-edit-details {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+  /* "All questions" and "Demo examples" wrap onto two lines at 390px,
+     making the tab row an uneven height — found in an actual mobile
+     screenshot, not assumed. Horizontal scroll (same pattern as the
+     category pills row just below it) keeps every tab label on one line
+     instead of shrinking or truncating the text. */
+  .source-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .source-tab {
+    flex-shrink: 0;
   }
   .form-row {
     grid-template-columns: 1fr;

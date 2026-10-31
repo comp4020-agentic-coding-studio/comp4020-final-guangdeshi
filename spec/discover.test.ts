@@ -85,3 +85,72 @@ describe("discover: category and search", () => {
     expect(html).not.toContain("Totally different title");
   });
 });
+
+// Content-source views (All questions / Community / Demo examples). The
+// per-source *filtering correctness* (does source=X actually include/
+// exclude the right rows) is covered end to end in
+// spec/discover-sources.test.ts against an isolated database, since
+// creating an is_demo=1 post requires calling src/db.ts directly. What
+// belongs here, against the shared HTTP test server, is the request/response
+// *plumbing* around that: default behavior, invalid-input handling, the
+// legacy URL redirect, and that the three tabs/empty-state render with the
+// right text and links for a real request.
+describe("discover: content-source param handling", () => {
+  it("a bare /discover (no ?source=) defaults to the 'all' view, not silently to 'community'", async () => {
+    const res = await fetch(new URL("/discover", baseUrl()));
+    const html = await res.text();
+    expect(html).toContain('aria-current="page">All questions<');
+  });
+
+  it("an invalid ?source= value falls back to 'all' rather than erroring or silently narrowing", async () => {
+    const res = await fetch(new URL("/discover?source=not-a-real-source", baseUrl()));
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('aria-current="page">All questions<');
+  });
+
+  it("?source=community and ?source=demo each mark their own tab active", async () => {
+    const communityHtml = await (await fetch(new URL("/discover?source=community", baseUrl()))).text();
+    expect(communityHtml).toContain('aria-current="page">Community<');
+    const demoHtml = await (await fetch(new URL("/discover?source=demo", baseUrl()))).text();
+    expect(demoHtml).toContain('aria-current="page">Demo examples<');
+    expect(demoHtml).toContain("Explore fictional purchasing scenarios");
+  });
+
+  it("GET /discover/demo redirects into the unified page with source=demo selected (legacy URL stays bookmarkable)", async () => {
+    const res = await fetch(new URL("/discover/demo", baseUrl()), { redirect: "manual" });
+    expect(res.status).toBe(303);
+    const location = res.headers.get("location")!;
+    const redirectedUrl = new URL(location, baseUrl());
+    expect(redirectedUrl.pathname).toBe("/discover");
+    expect(redirectedUrl.searchParams.get("source")).toBe("demo");
+  });
+
+  it("/discover/demo preserves an existing category filter through the redirect", async () => {
+    const res = await fetch(new URL("/discover/demo?category=audio", baseUrl()), { redirect: "manual" });
+    const location = res.headers.get("location")!;
+    const redirectedUrl = new URL(location, baseUrl());
+    expect(redirectedUrl.searchParams.get("category")).toBe("audio");
+    expect(redirectedUrl.searchParams.get("source")).toBe("demo");
+  });
+
+  it("the search and sort links on the page carry the current ?source= forward, so a filter combination survives navigation", async () => {
+    const res = await fetch(new URL("/discover?source=community&category=computing", baseUrl()));
+    const html = await res.text();
+    // The "Most discussed" sort link must keep both the chosen source and
+    // category, not silently reset either one when a visitor clicks it.
+    const sortLinkMatch = html.match(/href="\/discover\?([^"]*sort=discussed[^"]*)"/);
+    expect(sortLinkMatch, "expected a 'Most discussed' link on the page").toBeTruthy();
+    const sortParams = new URLSearchParams(sortLinkMatch![1]);
+    expect(sortParams.get("source")).toBe("community");
+    expect(sortParams.get("category")).toBe("computing");
+  });
+
+  it("a category with zero matches in the current source shows a specific empty state with a reset link and a cross-link to demo examples, not a bare blank page", async () => {
+    const res = await fetch(new URL("/discover?source=community&category=vehicles&q=" + encodeURIComponent(`NoSuchPostAnywhere${Date.now()}`), baseUrl()));
+    const html = await res.text();
+    expect(html).toContain("Nothing here yet");
+    expect(html).toContain("Reset category");
+    expect(html).toContain("See demo examples instead");
+  });
+});

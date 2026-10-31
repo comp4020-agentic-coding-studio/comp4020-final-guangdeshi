@@ -40,7 +40,7 @@ export function landingPage(
     ? `<section class="section">
         <div class="section-header">
           <h2>Recent purchasing questions</h2>
-          <a href="/discover" class="link-more">See all →</a>
+          <a href="/discover?source=community" class="link-more">See all →</a>
         </div>
         <div class="post-grid">${featured.map((f) => postCard(f.post, f)).join("\n")}</div>
       </section>`
@@ -52,7 +52,7 @@ export function landingPage(
         </div>
         ${demoPreview.length > 0
           ? `<div class="post-grid">${demoPreview.map((f) => postCard(f.post, f)).join("\n")}</div>
-             <div class="load-more-row"><a href="/discover/demo" class="link-more">See all demo scenarios →</a></div>`
+             <div class="load-more-row"><a href="/discover?source=demo" class="link-more">See all demo scenarios →</a></div>`
           : ""}
       </section>`;
 
@@ -156,61 +156,135 @@ export interface DiscoverFeedItem {
   comparisonOpinionCount?: number;
 }
 
+export type DiscoverSource = "all" | "community" | "demo";
+
+export interface DiscoverFilters {
+  categoryId?: string;
+  search?: string;
+  sort?: "recent" | "discussed";
+  source?: DiscoverSource;
+}
+
+/**
+ * A single unified Discover, not two separate pages — "All questions" mixes
+ * real community posts with clearly-labelled fictional demo scenarios (each
+ * card still carries its own real isDemo flag, see postCard's demo-tag
+ * overlay, so nothing here blurs the database-level distinction);
+ * "Community" and "Demo examples" are the same query with the is_demo
+ * filter pinned one way or the other. Every link below (category pill,
+ * source tab, sort toggle, search form, pagination) round-trips through
+ * the same param set so a filter combination survives navigation and is
+ * itself a shareable URL, per the brief's own URL-shareability expectation.
+ */
+function discoverParams(filters: DiscoverFilters, overrides: Record<string, string | undefined>): string {
+  const params = new URLSearchParams();
+  const merged = {
+    category: filters.categoryId,
+    q: filters.search,
+    source: filters.source && filters.source !== "all" ? filters.source : undefined,
+    sort: filters.sort === "discussed" ? "discussed" : undefined,
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(merged)) {
+    if (value) params.set(key, value);
+  }
+  return params.toString();
+}
+
 export function discoverPage(
   viewer: ViewerContext,
   items: DiscoverFeedItem[],
   categories: Category[],
-  filters: { categoryId?: string; search?: string; sort?: "recent" | "discussed" },
+  filters: DiscoverFilters,
   nextCursor: string | null,
 ): string {
-  const categoryPills = [`<a href="/discover" class="pill${!filters.categoryId ? " pill-active" : ""}">All</a>`]
+  const source = filters.source ?? "all";
+
+  const categoryPills = [`<a href="/discover?${discoverParams(filters, { category: undefined })}" class="pill${!filters.categoryId ? " pill-active" : ""}">All</a>`]
     .concat(
       categories.map(
         (c) =>
-          `<a href="/discover?category=${encodeURIComponent(c.id)}" class="pill${filters.categoryId === c.id ? " pill-active" : ""}">${escapeHtml(c.name)}</a>`,
+          `<a href="/discover?${discoverParams(filters, { category: c.id })}" class="pill${filters.categoryId === c.id ? " pill-active" : ""}">${escapeHtml(c.name)}</a>`,
       ),
     )
     .join("");
 
+  const sourceTabs = ([
+    { key: "all" as const, label: "All questions" },
+    { key: "community" as const, label: "Community" },
+    { key: "demo" as const, label: "Demo examples" },
+  ])
+    .map(
+      (t) =>
+        `<a href="/discover?${discoverParams(filters, { source: t.key === "all" ? undefined : t.key })}" class="source-tab${source === t.key ? " source-tab-active" : ""}" aria-current="${source === t.key ? "page" : "false"}">${t.label}</a>`,
+    )
+    .join("");
+
   const nextLink = nextCursor
-    ? `<a class="btn btn-ghost" href="/discover?${new URLSearchParams({
-        ...(filters.categoryId ? { category: filters.categoryId } : {}),
-        ...(filters.search ? { q: filters.search } : {}),
-        cursor: nextCursor,
-      }).toString()}">Load more →</a>`
+    ? `<a class="btn btn-ghost" href="/discover?${discoverParams(filters, { cursor: nextCursor })}">Load more →</a>`
     : "";
 
-  const sortParams = (sort: "recent" | "discussed") =>
-    new URLSearchParams({
-      ...(filters.categoryId ? { category: filters.categoryId } : {}),
-      ...(filters.search ? { q: filters.search } : {}),
-      sort,
-    }).toString();
   const sortToggle = `<div class="sort-toggle" role="radiogroup" aria-label="Sort posts">
-    <a href="/discover?${sortParams("recent")}" class="sort-option${filters.sort !== "discussed" ? " active" : ""}">Recent</a>
-    <a href="/discover?${sortParams("discussed")}" class="sort-option${filters.sort === "discussed" ? " active" : ""}">Most discussed</a>
+    <a href="/discover?${discoverParams(filters, { sort: undefined })}" class="sort-option${filters.sort !== "discussed" ? " active" : ""}">Recent</a>
+    <a href="/discover?${discoverParams(filters, { sort: "discussed" })}" class="sort-option${filters.sort === "discussed" ? " active" : ""}">Most discussed</a>
   </div>`;
+
+  const sourceNoun = source === "demo" ? "demo scenarios" : source === "community" ? "community posts" : "posts or demo scenarios";
+  const resetLink = filters.categoryId
+    ? `<a href="/discover?${discoverParams(filters, { category: undefined })}" class="link-more">Reset category →</a>`
+    : "";
+  // A category with zero matches in the current source is a normal, expected
+  // state (not every category has 18 demo scenarios' worth of coverage) —
+  // the empty state names the actual reason and offers the two real ways
+  // out (reset the category, or look at demo examples instead) rather than
+  // a single generic "nothing here" box the brief explicitly said to avoid.
+  const demoCrossLink =
+    source !== "demo"
+      ? `<a href="/discover?${discoverParams(filters, { source: "demo" })}" class="link-more">See demo examples instead →</a>`
+      : "";
+  const emptyBody = filters.search
+    ? `No ${sourceNoun} match "${filters.search}".`
+    : filters.categoryId
+    ? `No ${sourceNoun} in this category yet.`
+    : source === "community"
+    ? "This community is just getting started — no real posts yet."
+    : source === "demo"
+    ? "No demo scenarios yet — an admin hasn't seeded them."
+    : "Nothing here yet.";
+
+  const introLine =
+    source === "demo"
+      ? `<p class="discover-intro">Explore fictional purchasing scenarios to see how different needs can lead to different buying decisions.</p>`
+      : source === "all"
+      ? `<p class="discover-intro">Real community questions and clearly-labelled fictional examples, together.</p>`
+      : "";
 
   const body = `
 <section class="discover-header">
   <h1>Discover</h1>
   <form method="get" action="/discover" class="search-form">
     ${filters.categoryId ? `<input type="hidden" name="category" value="${escapeHtml(filters.categoryId)}" />` : ""}
+    ${source !== "all" ? `<input type="hidden" name="source" value="${escapeHtml(source)}" />` : ""}
     <input type="search" name="q" placeholder="Search purchasing questions…" value="${escapeHtml(filters.search ?? "")}" aria-label="Search posts" />
     <button type="submit" class="btn btn-brand">Search</button>
   </form>
 </section>
+<nav class="source-tabs" aria-label="Content source">${sourceTabs}</nav>
+${introLine}
 <nav class="category-pills" aria-label="Filter by category">${categoryPills}</nav>
 ${sortToggle}
 ${items.length > 0
   ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div><div class="load-more-row">${nextLink}</div>`
-  : emptyState({
-      icon: "🔍",
-      title: "Nothing here yet",
-      body: filters.search || filters.categoryId ? "Try a different search or category." : "No public posts yet — be the first to ask the community.",
-      actionHref: viewer.user ? "/posts/new" : "/register",
-      actionLabel: "Create a post",
-    })}`;
+  : `<div class="empty-state">
+      <div class="empty-state-icon">🔍</div>
+      <h3>Nothing here yet</h3>
+      <p>${escapeHtml(emptyBody)}</p>
+      <div class="empty-state-actions">
+        ${resetLink}
+        ${demoCrossLink}
+      </div>
+      ${source !== "demo" ? `<a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand">Create a post</a>` : ""}
+    </div>`}`;
   return layout({ title: "Discover", viewer, activeNav: "discover", body, bodyClass: "page-discover" });
 }
 
@@ -467,28 +541,6 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
 </article>
 <div id="live-connection-label" data-connected="false" hidden></div>`;
   return layout({ title: post.title, viewer, body, bodyClass: "page-post-detail" });
-}
-
-// ------------------------------------------------------------ demo feed ---
-
-/**
- * Feature D's "Explore Demo" section (brief: "a clearly labelled 'Explore
- * Demo' section," readable without registration — the route this renders
- * from, GET /discover/demo, has no auth requirement). Reuses postCard
- * (which already renders the 🤖 Demo tag on any post with isDemo=true)
- * rather than a parallel card component, so a demo post's card looks
- * exactly like a real one except for that one unmistakable tag.
- */
-export function demoFeedPage(viewer: ViewerContext, items: DiscoverFeedItem[]): string {
-  const body = `
-<section class="discover-header demo-feed-header">
-  <h1>Explore Demo</h1>
-  <p class="muted">${items.length} fictional purchasing scenarios, written to show what Buy or Pass looks like with an active community. None of these are real people, posts, or opinions.</p>
-</section>
-${items.length > 0
-  ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div>`
-  : emptyState({ icon: "🤖", title: "No demo scenarios yet", body: "An admin hasn't seeded the demo content yet." })}`;
-  return layout({ title: "Explore Demo", viewer, body, bodyClass: "page-discover page-demo-feed" });
 }
 
 // -------------------------------------------------------- create/edit -----
