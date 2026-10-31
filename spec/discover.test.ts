@@ -109,12 +109,15 @@ describe("discover: content-source param handling", () => {
     expect(html).toContain('aria-current="page">All questions<');
   });
 
-  it("?source=community and ?source=demo each mark their own tab active", async () => {
+  it("?source=community, ?source=demo, and ?source=references each mark their own tab active", async () => {
     const communityHtml = await (await fetch(new URL("/discover?source=community", baseUrl()))).text();
     expect(communityHtml).toContain('aria-current="page">Community<');
     const demoHtml = await (await fetch(new URL("/discover?source=demo", baseUrl()))).text();
     expect(demoHtml).toContain('aria-current="page">Demo examples<');
     expect(demoHtml).toContain("Explore fictional purchasing scenarios");
+    const referencesHtml = await (await fetch(new URL("/discover?source=references", baseUrl()))).text();
+    expect(referencesHtml).toContain('aria-current="page">Real-world examples<');
+    expect(referencesHtml).toContain("Real purchasing discussions from elsewhere on the web");
   });
 
   it("GET /discover/demo redirects into the unified page with source=demo selected (legacy URL stays bookmarkable)", async () => {

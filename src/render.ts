@@ -219,6 +219,49 @@ export function postCard(
 </a>`;
 }
 
+/**
+ * A real-world reference card (src/external-references.ts): a genuine,
+ * source-linked external purchasing discussion, never a local post.
+ * Deliberately NOT a reuse of postCard() — a reference has no author, no
+ * opinions, no vote stats, and must never visually read as a voteable local
+ * submission. The external badge and "not a Buy or Pass post" wording are
+ * load-bearing, not decorative: they're what keeps this from being mistaken
+ * for real community participation (see CLAUDE.md's demo/real separation
+ * rule, which this extends to a third, external kind of content).
+ */
+export function referenceCard(ref: {
+  id: string;
+  title: string;
+  categoryId: string;
+  categoryName: string;
+  sourceUrl: string;
+  sourcePlatform: string;
+  sourceDate: string;
+  summary: string;
+  knownGaps: string;
+  imageUrl: string | null;
+  imageIsRepresentative: boolean;
+}): string {
+  return `<div class="reference-card">
+  <div class="reference-card-image">
+    ${ref.imageUrl ? `<img src="${escapeHtml(ref.imageUrl)}" alt="" loading="lazy" />` : `<div class="reference-card-image-placeholder">🔗</div>`}
+    ${ref.imageIsRepresentative && ref.imageUrl ? `<span class="reference-card-tag representative-tag">Representative photo</span>` : ""}
+    <span class="reference-card-category">${escapeHtml(ref.categoryName)}</span>
+  </div>
+  <div class="reference-card-body">
+    <span class="reference-external-badge">🔗 External discussion — not a Buy or Pass post</span>
+    <h3 class="reference-card-title">${escapeHtml(ref.title)}</h3>
+    <p class="reference-card-meta">${escapeHtml(ref.sourcePlatform)} · ${escapeHtml(ref.sourceDate)}</p>
+    <p class="reference-card-summary">${escapeHtml(ref.summary)}</p>
+    <p class="reference-card-gaps"><strong>What's not known:</strong> ${escapeHtml(ref.knownGaps)}</p>
+    <div class="reference-card-actions">
+      <a href="${escapeHtml(ref.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-small reference-source-link">Read the original source ↗</a>
+      <a href="/posts/new?category=${encodeURIComponent(ref.categoryId)}" class="btn btn-brand btn-small">Ask your own version of this question</a>
+    </div>
+  </div>
+</div>`;
+}
+
 export function emptyState(opts: { icon: string; title: string; body: string; actionHref?: string; actionLabel?: string }): string {
   return `<div class="empty-state">
   <div class="empty-state-icon">${opts.icon}</div>

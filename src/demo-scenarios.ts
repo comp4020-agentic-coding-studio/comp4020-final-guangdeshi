@@ -41,7 +41,7 @@ export interface DemoOptionSeed {
   specifications?: Record<string, string>;
 }
 
-export type ImageKey = "macmini" | "sleepingbag" | "headphones" | "backpack" | null;
+export type ImageKey = "macmini" | "sleepingbag" | "headphones" | "backpack" | "espresso" | "airfryer" | "roomba" | null;
 
 export interface DemoScenario {
   authorHandle: string;
@@ -300,7 +300,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     categoryId: "home-kitchen",
     tags: ["robot-vacuum", "small-space"],
     mode: "BUY_PASS",
-    imageKey: null,
+    imageKey: "roomba",
     priceCents: 35000,
     currency: "AUD",
     context: {
@@ -353,7 +353,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     categoryId: "home-kitchen",
     tags: ["coffee", "espresso-machine"],
     mode: "BUY_PASS",
-    imageKey: null,
+    imageKey: "espresso",
     priceCents: 65000,
     currency: "AUD",
     context: {
@@ -404,7 +404,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     tags: ["air-fryer", "kitchen"],
     mode: "WHICH_ONE",
     options: [
-      { name: "Basic 2L air fryer", imageKey: null, expectedPriceCents: 4500, currency: "AUD", specifications: { Capacity: "2L", Presets: "None, manual dial" } },
+      { name: "Basic 2L air fryer", imageKey: "airfryer", expectedPriceCents: 4500, currency: "AUD", specifications: { Capacity: "2L", Presets: "None, manual dial" } },
       { name: "Mid-range 5L with presets", imageKey: null, expectedPriceCents: 12000, currency: "AUD", specifications: { Capacity: "5L", Presets: "8 presets" } },
       { name: "Premium 8L dual-zone", imageKey: null, expectedPriceCents: 25000, currency: "AUD", originalPriceCents: 30000, saleNote: "$50 off this week", specifications: { Capacity: "8L dual-zone", Presets: "12 presets" } },
     ],

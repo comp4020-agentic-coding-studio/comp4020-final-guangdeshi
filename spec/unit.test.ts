@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword, isValidEmail, isValidHandle, isValidPassword } from "../src/auth.ts";
 import { validateOpinionInput, validatePostInput, normalizeTags, escapeHtml } from "../src/validation.ts";
-import { postCard } from "../src/render.ts";
+import { postCard, referenceCard } from "../src/render.ts";
 import type { Post } from "../src/db.ts";
 
 describe("password hashing", () => {
@@ -201,5 +201,57 @@ describe("postCard: demo label and mode tag rendering", () => {
   it("a comparison post with zero real opinions also renders 'No opinions yet', not a fabricated comparison count", () => {
     const html = postCard(makePost({ mode: "WHICH_ONE" }), { ...cardOpts, comparisonOpinionCount: 0 });
     expect(html).toContain("No opinions yet");
+  });
+});
+
+describe("referenceCard: real-world reference rendering", () => {
+  const baseRef = {
+    id: "ref-test",
+    title: "A real external discussion",
+    categoryId: "computing",
+    categoryName: "Computing & Tech",
+    sourceUrl: "https://forums.example.com/thread/123",
+    sourcePlatform: "Example Forums",
+    sourceDate: "2020-01-01",
+    summary: "A verified summary of the real discussion.",
+    knownGaps: "The final purchase was never confirmed.",
+    imageUrl: null as string | null,
+    imageIsRepresentative: false,
+  };
+
+  it("always shows the external badge and never any vote-stat markup", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain("External discussion — not a Buy or Pass post");
+    expect(html).not.toContain("stat-bar-fill");
+    expect(html).not.toContain("post-card-demo");
+  });
+
+  it("links to the real source URL with rel=noopener noreferrer and opens in a new tab", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain(`href="${baseRef.sourceUrl}"`);
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it("links 'Ask your own version' to /posts/new with the reference's own category preselected", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain(`/posts/new?category=${baseRef.categoryId}`);
+  });
+
+  it("shows a 'Representative photo' tag only when an image is present and marked representative", () => {
+    const withRepImage = referenceCard({ ...baseRef, imageUrl: "/static/assets/references/x.jpg", imageIsRepresentative: true });
+    expect(withRepImage).toContain("Representative photo");
+
+    const withExactImage = referenceCard({ ...baseRef, imageUrl: "/static/assets/references/x.jpg", imageIsRepresentative: false });
+    expect(withExactImage).not.toContain("Representative photo");
+
+    const withNoImage = referenceCard({ ...baseRef, imageUrl: null, imageIsRepresentative: true });
+    expect(withNoImage).not.toContain("Representative photo");
+    expect(withNoImage).toContain("reference-card-image-placeholder");
+  });
+
+  it("always renders the knownGaps text, never hiding what the source doesn't say", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain("The final purchase was never confirmed.");
   });
 });

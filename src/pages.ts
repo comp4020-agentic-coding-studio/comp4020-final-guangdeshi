@@ -4,6 +4,7 @@
 // every user-authored string passed through escapeHtml() before interpolation.
 import type { Category, Opinion, OpinionWithAuthor, Post, PostContext, PostMode, PostOutcome, PurchaseOption, User } from "./db.ts";
 import { getContextPrompts, type ContextPrompt } from "./context-prompts.ts";
+import type { ExternalReference } from "./external-references.ts";
 import { escapeHtml } from "./validation.ts";
 import {
   categoryOptions,
@@ -16,6 +17,7 @@ import {
   outcomeBadge,
   postCard,
   purchaseOptionCard,
+  referenceCard,
   relatedDecisionCard,
   stanceBadge,
   timeAgo,
@@ -156,7 +158,7 @@ export interface DiscoverFeedItem {
   comparisonOpinionCount?: number;
 }
 
-export type DiscoverSource = "all" | "community" | "demo";
+export type DiscoverSource = "all" | "community" | "demo" | "references";
 
 export interface DiscoverFilters {
   categoryId?: string;
@@ -191,14 +193,21 @@ function discoverParams(filters: DiscoverFilters, overrides: Record<string, stri
   return params.toString();
 }
 
+export interface DiscoverReferenceItem extends ExternalReference {
+  categoryName: string;
+  imageUrl: string | null;
+}
+
 export function discoverPage(
   viewer: ViewerContext,
   items: DiscoverFeedItem[],
   categories: Category[],
   filters: DiscoverFilters,
   nextCursor: string | null,
+  referenceItems: DiscoverReferenceItem[] = [],
 ): string {
   const source = filters.source ?? "all";
+  const isReferences = source === "references";
 
   const categoryPills = [`<a href="/discover?${discoverParams(filters, { category: undefined })}" class="pill${!filters.categoryId ? " pill-active" : ""}">All</a>`]
     .concat(
@@ -213,6 +222,7 @@ export function discoverPage(
     { key: "all" as const, label: "All questions" },
     { key: "community" as const, label: "Community" },
     { key: "demo" as const, label: "Demo examples" },
+    { key: "references" as const, label: "Real-world examples" },
   ])
     .map(
       (t) =>
@@ -224,12 +234,19 @@ export function discoverPage(
     ? `<a class="btn btn-ghost" href="/discover?${discoverParams(filters, { cursor: nextCursor })}">Load more →</a>`
     : "";
 
-  const sortToggle = `<div class="sort-toggle" role="radiogroup" aria-label="Sort posts">
+  // References are a small, static set (8ish entries) — sorting "recent" vs
+  // "most discussed" is meaningless for them (no created_at that matters, no
+  // opinion count at all), so the sort toggle is simply omitted on this tab
+  // rather than rendered with controls that would do nothing.
+  const sortToggle = isReferences
+    ? ""
+    : `<div class="sort-toggle" role="radiogroup" aria-label="Sort posts">
     <a href="/discover?${discoverParams(filters, { sort: undefined })}" class="sort-option${filters.sort !== "discussed" ? " active" : ""}">Recent</a>
     <a href="/discover?${discoverParams(filters, { sort: "discussed" })}" class="sort-option${filters.sort === "discussed" ? " active" : ""}">Most discussed</a>
   </div>`;
 
-  const sourceNoun = source === "demo" ? "demo scenarios" : source === "community" ? "community posts" : "posts or demo scenarios";
+  const sourceNoun =
+    source === "demo" ? "demo scenarios" : source === "community" ? "community posts" : source === "references" ? "real-world examples" : "posts or demo scenarios";
   const resetLink = filters.categoryId
     ? `<a href="/discover?${discoverParams(filters, { category: undefined })}" class="link-more">Reset category →</a>`
     : "";
@@ -239,7 +256,7 @@ export function discoverPage(
   // out (reset the category, or look at demo examples instead) rather than
   // a single generic "nothing here" box the brief explicitly said to avoid.
   const demoCrossLink =
-    source !== "demo"
+    source !== "demo" && source !== "references"
       ? `<a href="/discover?${discoverParams(filters, { source: "demo" })}" class="link-more">See demo examples instead →</a>`
       : "";
   const emptyBody = filters.search
@@ -250,6 +267,8 @@ export function discoverPage(
     ? "This community is just getting started — no real posts yet."
     : source === "demo"
     ? "No demo scenarios yet — an admin hasn't seeded them."
+    : source === "references"
+    ? "No real-world examples in this category yet."
     : "Nothing here yet.";
 
   const introLine =
@@ -257,7 +276,33 @@ export function discoverPage(
       ? `<p class="discover-intro">Explore fictional purchasing scenarios to see how different needs can lead to different buying decisions.</p>`
       : source === "all"
       ? `<p class="discover-intro">Real community questions and clearly-labelled fictional examples, together.</p>`
+      : source === "references"
+      ? `<p class="discover-intro">Real purchasing discussions from elsewhere on the web — not local posts, and not open to voting here.</p>`
       : "";
+
+  const mainContent = isReferences
+    ? referenceItems.length > 0
+      ? `<div class="post-grid reference-grid">${referenceItems.map((r) => referenceCard(r)).join("\n")}</div>`
+      : `<div class="empty-state">
+          <div class="empty-state-icon">🔍</div>
+          <h3>Nothing here yet</h3>
+          <p>${escapeHtml(emptyBody)}</p>
+          <div class="empty-state-actions">
+            ${resetLink}
+          </div>
+        </div>`
+    : items.length > 0
+    ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div><div class="load-more-row">${nextLink}</div>`
+    : `<div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h3>Nothing here yet</h3>
+        <p>${escapeHtml(emptyBody)}</p>
+        <div class="empty-state-actions">
+          ${resetLink}
+          ${demoCrossLink}
+        </div>
+        ${source !== "demo" ? `<a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand">Create a post</a>` : ""}
+      </div>`;
 
   const body = `
 <section class="discover-header">
@@ -273,18 +318,7 @@ export function discoverPage(
 ${introLine}
 <nav class="category-pills" aria-label="Filter by category">${categoryPills}</nav>
 ${sortToggle}
-${items.length > 0
-  ? `<div class="post-grid">${items.map((i) => postCard(i.post, i)).join("\n")}</div><div class="load-more-row">${nextLink}</div>`
-  : `<div class="empty-state">
-      <div class="empty-state-icon">🔍</div>
-      <h3>Nothing here yet</h3>
-      <p>${escapeHtml(emptyBody)}</p>
-      <div class="empty-state-actions">
-        ${resetLink}
-        ${demoCrossLink}
-      </div>
-      ${source !== "demo" ? `<a href="${viewer.user ? "/posts/new" : "/register"}" class="btn btn-brand">Create a post</a>` : ""}
-    </div>`}`;
+${mainContent}`;
   return layout({ title: "Discover", viewer, activeNav: "discover", body, bodyClass: "page-discover" });
 }
 
@@ -551,6 +585,10 @@ export interface CreateEditPostMode {
   existingImageIds?: string[];
   existingOptions?: PurchaseOption[];
   existingContext?: PostContext | null;
+  // Create mode only — preselects a category from a ?category= link (e.g. a
+  // real-world reference's "Ask your own version of this question" button),
+  // never used in edit mode where the post's own existing category wins.
+  preselectedCategoryId?: string;
 }
 
 /**
@@ -679,8 +717,8 @@ export function createEditPostPage(
 
     <label>Category
       <select name="category" required id="category-select">
-        <option value="" disabled ${!post ? "selected" : ""}>Choose a category…</option>
-        ${categoryOptions(categories, post?.categoryId)}
+        <option value="" disabled ${!post && !mode.preselectedCategoryId ? "selected" : ""}>Choose a category…</option>
+        ${categoryOptions(categories, post?.categoryId ?? mode.preselectedCategoryId)}
       </select>
     </label>
 

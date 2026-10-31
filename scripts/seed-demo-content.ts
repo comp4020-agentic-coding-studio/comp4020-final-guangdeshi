@@ -57,17 +57,29 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR ?? "./data/uploads";
 const REAL_SOURCE_FILES: Record<Exclude<ImageKey, null>, string> = {
   macmini: "macmini.jpg",
   sleepingbag: "sleepingbag.jpg",
-  headphones: "headphones.svg",
+  // Was a 100x100px line-icon SVG (The Noun Project, CC0) rasterized at its
+  // native size — it rendered as a near-solid black square, not a usable
+  // product photo (found via direct image inspection, not assumed from the
+  // file existing). Replaced with a genuine photograph; see
+  // docs/research/IMAGE_PROVENANCE.md for the swap record.
+  headphones: "headphones.jpg",
   backpack: "backpack.jpg",
+  espresso: "espresso.jpg",
+  airfryer: "airfryer.jpg",
+  roomba: "roomba.jpg",
 };
 
-// Attribution text required for the one CC BY image (see
-// docs/research/IMAGE_PROVENANCE.md) — appended to that scenario's
-// description so the requirement ("attribution wherever the work is
-// reused") is satisfied in the rendered page itself, not only in the repo's
-// own provenance manifest.
+// Attribution text required for images whose license demands it (CC BY /
+// CC BY-SA — see docs/research/IMAGE_PROVENANCE.md) — appended to that
+// scenario's description so the requirement ("attribution wherever the
+// work is reused") is satisfied in the rendered page itself, not only in
+// the repo's own provenance manifest.
 const CC_BY_ATTRIBUTION: Partial<Record<Exclude<ImageKey, null>, string>> = {
   macmini: "Photo by Seasider53, Wikimedia Commons, CC BY 4.0.",
+  headphones: "Photo by Adamantios, Wikimedia Commons, CC BY-SA 3.0.",
+  espresso: "Photo by Jmak, Wikimedia Commons, CC BY-SA 3.0.",
+  airfryer: "Photo by Ashley Pomeroy, Wikimedia Commons, CC BY 4.0.",
+  roomba: "Photo by Auledas, Wikimedia Commons, CC BY-SA 4.0.",
 };
 
 // Greedy word-wrap, estimating each character's rendered width rather than
@@ -252,7 +264,16 @@ export async function seedDemoContent(): Promise<SeedResult> {
       continue;
     }
 
-    // WHICH_ONE
+    // WHICH_ONE — attribution for a licensed photo can live on an option
+    // rather than the scenario itself (e.g. the air fryer scenario has no
+    // top-level imageKey, but its "Basic 2L air fryer" option does), so
+    // every option's imageKey is checked too, not just the scenario's own.
+    for (const opt of scenario.options ?? []) {
+      if (opt.imageKey && CC_BY_ATTRIBUTION[opt.imageKey]) {
+        description += `\n\n(${CC_BY_ATTRIBUTION[opt.imageKey]})`;
+      }
+    }
+
     const post = createPost(
       {
         authorId,

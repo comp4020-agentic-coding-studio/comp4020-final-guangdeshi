@@ -106,7 +106,10 @@ import {
   registerPage,
   type ActivityFeedItem,
   type DiscoverFeedItem,
+  type DiscoverReferenceItem,
+  type DiscoverSource,
 } from "./pages.ts";
+import { EXTERNAL_REFERENCES, type ExternalReference } from "./external-references.ts";
 import { recommendationService } from "./recommendation/chronological.ts";
 import { addLogClient, addPostClient, broadcastToPost, sseClientCounts, startHeartbeat } from "./sse.ts";
 import {
@@ -422,6 +425,8 @@ const STATIC_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
 };
 
 function handleStatic(ctx: RequestContext): void {
@@ -546,16 +551,50 @@ function handleLogout(ctx: RequestContext): void {
 
 // ------------------------------------------------------------ discover ----
 
-const VALID_SOURCES = new Set(["all", "community", "demo"]);
+const VALID_SOURCES = new Set(["all", "community", "demo", "references"]);
+
+function referenceImageUrl(ref: ExternalReference): string | null {
+  if (!ref.imageKey) return null;
+  return `/static/assets/references/${ref.imageKey}.jpg`;
+}
+
+function toDiscoverReferenceItem(ref: ExternalReference): DiscoverReferenceItem {
+  return {
+    ...ref,
+    categoryName: getCategoryById(ref.categoryId)?.name ?? ref.categoryId,
+    imageUrl: referenceImageUrl(ref),
+  };
+}
 
 /**
- * A single unified Discover with three content-source views (brief: "make
- * Discover a unified browsing experience"). /discover/demo (handleDemoFeed
- * below) now just redirects here with ?source=demo instead of running its
- * own separate query/page — one code path for "which posts are eligible,"
- * not two that could drift apart. An invalid or missing ?source always
- * falls back to "all" (never silently to "community", which would hide the
- * one thing a brand-new, empty-real-feed visitor most needs to see).
+ * References are a small (~8 entry), hand-curated, code-level list — never a
+ * posts-table row (see src/external-references.ts's own header comment for
+ * why) — so this is a plain in-memory filter, not a database query. No
+ * pagination: the whole filtered set renders on one page, same as the demo
+ * feed's own "a showcase never needs real pagination" reasoning.
+ */
+function filterReferences(categoryId: string | undefined, search: string | undefined): DiscoverReferenceItem[] {
+  const matches = search ? EXTERNAL_REFERENCES.filter((r) => !categoryId || r.categoryId === categoryId).filter((r) => {
+    const q = search.toLowerCase();
+    return r.title.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q);
+  }) : EXTERNAL_REFERENCES.filter((r) => !categoryId || r.categoryId === categoryId);
+  return matches.map(toDiscoverReferenceItem);
+}
+
+/**
+ * A single unified Discover with four content-source views: All questions,
+ * Community, Demo examples, and Real-world examples (brief: "make Discover a
+ * unified browsing experience"). /discover/demo (handleDemoFeed below) now
+ * just redirects here with ?source=demo instead of running its own separate
+ * query/page — one code path for "which posts are eligible," not two that
+ * could drift apart. An invalid or missing ?source always falls back to
+ * "all" (never silently to "community", which would hide the one thing a
+ * brand-new, empty-real-feed visitor most needs to see).
+ *
+ * "references" is handled in its own early branch rather than threaded
+ * through FeedSource/listFeed/listMostDiscussed — a reference is never a row
+ * in `posts`, so it was never eligible for those queries to begin with (see
+ * src/external-references.ts).
  */
 function handleDiscover(ctx: RequestContext): void {
   const categoryId = ctx.url.searchParams.get("category") ?? undefined;
@@ -563,8 +602,14 @@ function handleDiscover(ctx: RequestContext): void {
   const cursor = ctx.url.searchParams.get("cursor") ?? undefined;
   const sort = ctx.url.searchParams.get("sort") === "discussed" ? "discussed" : "recent";
   const rawSource = ctx.url.searchParams.get("source") ?? "all";
-  const source: FeedSource = VALID_SOURCES.has(rawSource) ? (rawSource as FeedSource) : "all";
+  const source: DiscoverSource = VALID_SOURCES.has(rawSource) ? (rawSource as DiscoverSource) : "all";
   const filters = { categoryId, search, sort: sort as "recent" | "discussed", source };
+
+  if (source === "references") {
+    const referenceItems = filterReferences(categoryId, search);
+    sendHtml(ctx.res, 200, discoverPage(viewerContextOf(ctx), [], listCategories(), filters, null, referenceItems));
+    return;
+  }
 
   // "Most discussed" is a single bounded highlights page (no pagination, no
   // category/search combination) — see listMostDiscussed's own comment for
@@ -612,7 +657,14 @@ function handleDemoFeed(ctx: RequestContext): void {
 
 function handleNewPostForm(ctx: RequestContext): void {
   requireAuth(ctx);
-  sendHtml(ctx.res, 200, createEditPostPage(viewerContextOf(ctx), listCategories(), null, { kind: "create" }));
+  // ?category= preselects the category dropdown (used by a real-world
+  // reference's "Ask your own version of this question" link) — validated
+  // against the real category list rather than trusted blindly, so an
+  // unrecognized or tampered value just falls back to no preselection.
+  const rawCategory = ctx.url.searchParams.get("category") ?? undefined;
+  const categories = listCategories();
+  const preselectedCategoryId = rawCategory && categories.some((c) => c.id === rawCategory) ? rawCategory : undefined;
+  sendHtml(ctx.res, 200, createEditPostPage(viewerContextOf(ctx), categories, null, { kind: "create", preselectedCategoryId }));
 }
 
 function parsePrice(raw: unknown): number | null {
