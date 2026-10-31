@@ -287,6 +287,73 @@ const MIGRATIONS: Migration[] = [
       CREATE VIRTUAL TABLE posts_search USING fts5(post_id UNINDEXED, title, description, context_text);
     `,
   },
+  {
+    // Real product catalog, separate from user-created purchasing posts. A
+    // catalog product is factual product data (name, brand, photo, known
+    // attributes) imported from a licensed dataset — never a price, rating,
+    // review or availability claim. Catalog images get their own table rather
+    // than reusing `images`, whose owner_user_id is a required FK to a real
+    // registered user; a catalog product has no owning user. Posts and
+    // purchase options gain a nullable link so a real question can be about a
+    // catalog product without every question being forced through one.
+    name: "0008_product_catalog",
+    sql: `
+      CREATE TABLE catalog_import_sources (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        license TEXT NOT NULL,
+        license_url TEXT NOT NULL,
+        attribution TEXT NOT NULL,
+        retrieved_at TEXT NOT NULL,
+        imported_at TEXT NOT NULL
+      );
+
+      CREATE TABLE catalog_products (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL REFERENCES catalog_import_sources(id),
+        source_item_id TEXT NOT NULL,
+        source_domain TEXT NOT NULL,
+        category_id TEXT NOT NULL REFERENCES categories(id),
+        name TEXT NOT NULL,
+        original_title TEXT NOT NULL,
+        brand TEXT NULL,
+        product_type TEXT NULL,
+        key_attribute TEXT NULL,
+        features TEXT NOT NULL DEFAULT '[]',
+        imported_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (source_id, source_item_id)
+      );
+      CREATE INDEX idx_catalog_products_category ON catalog_products(category_id, name);
+
+      CREATE TABLE catalog_product_images (
+        id TEXT PRIMARY KEY,
+        product_id TEXT NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL,
+        source_image_id TEXT NOT NULL,
+        source_image_url TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        width INTEGER NOT NULL,
+        height INTEGER NOT NULL,
+        original_width INTEGER NOT NULL,
+        original_height INTEGER NOT NULL,
+        UNIQUE (product_id, position)
+      );
+
+      CREATE TABLE catalog_product_attributes (
+        product_id TEXT NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        value TEXT NOT NULL,
+        PRIMARY KEY (product_id, name)
+      );
+
+      ALTER TABLE posts ADD COLUMN catalog_product_id TEXT NULL REFERENCES catalog_products(id);
+      CREATE INDEX idx_posts_catalog_product ON posts(catalog_product_id);
+      ALTER TABLE purchase_options ADD COLUMN catalog_product_id TEXT NULL REFERENCES catalog_products(id);
+      CREATE INDEX idx_purchase_options_catalog_product ON purchase_options(catalog_product_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

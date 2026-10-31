@@ -283,6 +283,7 @@ export interface Post {
   status: "active" | "deleted";
   mode: PostMode;
   isDemo: boolean;
+  catalogProductId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -301,6 +302,7 @@ export function rowToPost(row: any): Post {
     status: row.status,
     mode: row.post_mode,
     isDemo: !!row.is_demo,
+    catalogProductId: row.catalog_product_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -317,6 +319,7 @@ export interface NewPost {
   visibility: "public" | "unlisted";
   mode?: PostMode; // defaults to BUY_PASS — the only mode that existed pre-v2
   isDemo?: boolean; // defaults to false; only scripts/seed-demo-content.ts ever passes true
+  catalogProductId?: string | null; // the real catalog product this question is about, if any
 }
 
 export function createPost(input: NewPost, imageIds: string[]): Post {
@@ -325,8 +328,8 @@ export function createPost(input: NewPost, imageIds: string[]): Post {
   db.exec("BEGIN");
   try {
     db.prepare(
-      `INSERT INTO posts (id, author_id, title, description, price_cents, currency, category_id, tags, visibility, status, post_mode, is_demo, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+      `INSERT INTO posts (id, author_id, title, description, price_cents, currency, category_id, tags, visibility, status, post_mode, is_demo, catalog_product_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.authorId,
@@ -339,6 +342,7 @@ export function createPost(input: NewPost, imageIds: string[]): Post {
       input.visibility,
       input.mode ?? "BUY_PASS",
       input.isDemo ? 1 : 0,
+      input.catalogProductId ?? null,
       ts,
       ts,
     );
@@ -626,6 +630,7 @@ export interface PurchaseOption {
   sourceUrl: string | null;
   saleNote: string | null;
   specifications: Record<string, string> | null;
+  catalogProductId: string | null;
   createdAt: string;
 }
 
@@ -643,6 +648,7 @@ function rowToPurchaseOption(row: any): PurchaseOption {
     sourceUrl: row.source_url,
     saleNote: row.sale_note,
     specifications: row.specifications ? JSON.parse(row.specifications) : null,
+    catalogProductId: row.catalog_product_id ?? null,
     createdAt: row.created_at,
   };
 }
@@ -657,6 +663,7 @@ export interface NewPurchaseOption {
   sourceUrl?: string | null;
   saleNote?: string | null;
   specifications?: Record<string, string> | null;
+  catalogProductId?: string | null;
 }
 
 /**
@@ -673,8 +680,8 @@ export function setPurchaseOptions(postId: string, options: NewPurchaseOption[])
     db.prepare(`DELETE FROM purchase_options WHERE post_id = ?`).run(postId);
     const ts = now();
     const insert = db.prepare(
-      `INSERT INTO purchase_options (id, post_id, position, name, image_id, expected_price_cents, currency, original_price_cents, condition, source_url, sale_note, specifications, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO purchase_options (id, post_id, position, name, image_id, expected_price_cents, currency, original_price_cents, condition, source_url, sale_note, specifications, catalog_product_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     options.forEach((opt, index) => {
       insert.run(
@@ -690,6 +697,7 @@ export function setPurchaseOptions(postId: string, options: NewPurchaseOption[])
         opt.sourceUrl ?? null,
         opt.saleNote ?? null,
         opt.specifications ? JSON.stringify(opt.specifications) : null,
+        opt.catalogProductId ?? null,
         ts,
       );
     });

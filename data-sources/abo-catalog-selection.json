@@ -1,0 +1,1708 @@
+{
+  "source": "Amazon Berkeley Objects (ABO)",
+  "sourceUrl": "https://amazon-berkeley-objects.s3.us-east-1.amazonaws.com/index.html",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "Product data and images: Amazon.com, via the Amazon Berkeley Objects dataset (CC BY 4.0). Images resized and re-encoded; product names shortened for display (original titles retained).",
+  "retrievedAt": "2026-10-31",
+  "rejected": [
+    {
+      "sourceId": "B07TVRZZWB",
+      "reason": "main_image is an AmazonBasics logo, not a product photo"
+    },
+    {
+      "sourceId": "B07PW6PTC5",
+      "reason": "main_image is an AmazonBasics logo, not a product photo"
+    }
+  ],
+  "products": [
+    {
+      "sourceId": "B07TPYLKQ6",
+      "sourceDomain": "amazon.com.au",
+      "categoryId": "fashion",
+      "displayName": "AmazonBasics Casual Sports Backpack",
+      "keyAttribute": "30L capacity",
+      "originalTitle": "AmazonBasics Casual Sports Backpack",
+      "brand": "AmazonBasics",
+      "productType": "BACKPACK",
+      "attributes": {
+        "Weight": "0.86 pounds",
+        "Dimensions": "12.6 inches × 5.7 inches × 20.5 inches"
+      },
+      "features": [
+        "Casual sports backpack with 30L capacity and a compact size for carrying essential items",
+        "Main compartment for clothing; zippered pocket in main compartment; front zippered accessory pocket with organizers; front bungee strap system for securing a jacket or pair of shoes",
+        "Made of durable polyester in a stylish blue color; air holes for ventilation",
+        "Padded shoulder straps and back panel provide added comfort; top handle makes it easy to lift; folds into a small size when not in use"
+      ],
+      "imageId": "91ULzMo7OZL",
+      "imagePath": "e6/e6d72579.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B06XCPVVPS",
+      "sourceDomain": "amazon.com",
+      "categoryId": "fashion",
+      "displayName": "find. Albert Men's Chelsea Boots",
+      "keyAttribute": "Imitation-suede uppers, wooden sole",
+      "originalTitle": "Amazon Brand - find. Albert, Men’s Chelsea Boots Chelsea Boots, Black (Black), US 12",
+      "brand": "find.",
+      "productType": "BOOT",
+      "attributes": {
+        "Color": "Black",
+        "Model": "Albert"
+      },
+      "features": [
+        "Built wooden sole",
+        "Imitation-suede leather uppers",
+        "Rounded toe",
+        "Order a size above your usual size"
+      ],
+      "imageId": "71KwV3JHT9L",
+      "imagePath": "ff/ffb123bf.jpg",
+      "imageWidth": 1969,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B075X4QMW7",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Rivet Eva Tufted Velvet Sectional Sofa",
+      "keyAttribute": "87\" wide, navy velvet",
+      "originalTitle": "Amazon Brand – Rivet Eva Mid-Century Modern Tufted Velvet Down-Filled Sectional Sofa Couch, 87\"W, Navy",
+      "brand": "Rivet",
+      "productType": "SOFA",
+      "attributes": {
+        "Color": "Navy",
+        "Material": "Velvet, Hardwood frame, Metal legs",
+        "Weight": "182.38 pounds",
+        "Dimensions": "35.3 inches × 87 inches × 30.3 inches"
+      },
+      "features": [
+        "Bring stunning, Mid-century elegance to your living room with this hand-tufted sofa featuring luxurious velvet upholstery. The plush down-filled bench cushion is removable and reversible and is held in place by clips at the corners.",
+        "87\"W x 35.25''D x 30.25''H",
+        "Durable polyester velvet on hardwood frame and brushed brass legs",
+        "Modern elegant style with reversible cushion to extend the life of the piece"
+      ],
+      "imageId": "81KZp1brWYL",
+      "imagePath": "f3/f30d699e.jpg",
+      "imageWidth": 2546,
+      "imageHeight": 1167
+    },
+    {
+      "sourceId": "B07F2X8K62",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Ravenna Home Radford Curved Arm Accent Chair",
+      "keyAttribute": "28.15\" wide",
+      "originalTitle": "Amazon Brand – Ravenna Home Radford Modern Curved Arm Accent Chair, 28.15\"W",
+      "brand": "Ravenna Home",
+      "productType": "CHAIR",
+      "attributes": {},
+      "features": [],
+      "imageId": "A1n9ZOzRyQL",
+      "imagePath": "1c/1c413c58.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B087MDYP24",
+      "sourceDomain": "amazon.in",
+      "categoryId": "computing",
+      "displayName": "AmazonBasics 98W Four-Port GaN Wall Charger",
+      "keyAttribute": "2× USB-C, 2× USB-A",
+      "originalTitle": "AmazonBasics 98W Four-Port GaN Wall Charger with 2 USB-C Ports (60W + 18W) and 2 USB-A Ports (10W + 10W) - Black",
+      "brand": "AmazonBasics",
+      "productType": "CHARGING_ADAPTER",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "0.56 pounds",
+        "Dimensions": "3.2 inches × 1.2 inches × 3.1 inches"
+      },
+      "features": [],
+      "imageId": "71jxGyJgeKL",
+      "imagePath": "46/462f9217.jpg",
+      "imageWidth": 1964,
+      "imageHeight": 1964
+    },
+    {
+      "sourceId": "B07914BSLG",
+      "sourceDomain": "amazon.in",
+      "categoryId": "fashion",
+      "displayName": "Symbol Men's White Sneakers",
+      "keyAttribute": "Synthetic upper",
+      "originalTitle": "Amazon Brand - Symbol Men's White Sneakers-11 UK/India (46 EU) (AZ-YS-187 C)",
+      "brand": "Amazon Brand - Symbol",
+      "productType": "SHOES",
+      "attributes": {
+        "Color": "White",
+        "Material": "Synthetic"
+      },
+      "features": [
+        "Outer Material: Synthetic",
+        "Lifestyle: Men's Casual Shoes",
+        "Product Type: Sneakers",
+        "Shoe Width: Medium"
+      ],
+      "imageId": "715AhvOEe4L",
+      "imagePath": "8b/8b100bbe.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B073P3NK7T",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Stone & Beam Crystal Glass Table Lamp",
+      "keyAttribute": "Marble and crystal base, with bulb",
+      "originalTitle": "Amazon Brand – Stone & Beam Modern Crystal Glass Rectangle Table Desk Lamp With Bulb And White Shade - 18 x 12 x 12 Inches",
+      "brand": "Stone & Beam",
+      "productType": "LAMP",
+      "attributes": {
+        "Color": "Polished Nickel",
+        "Material": "Metal+Crystal+Fabric",
+        "Weight": "11.4 pounds",
+        "Dimensions": "12 inches × 12 inches × 18 inches"
+      },
+      "features": [
+        "This stately lamp combines a narrow base of white marble and clear crystal glass with a white fabric shade for a very contemporary effect. This eye-catching lamp will make an impression while illuminating your room.",
+        "Contemporary style with classic materials",
+        "Marble and crystal glass base, polished nickel hardware, white fabric shade",
+        "10.5\" width makes it compact for small tables"
+      ],
+      "imageId": "81oTHF1PcUL",
+      "imagePath": "f1/f154a661.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07PDYW6VM",
+      "sourceDomain": "amazon.de",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Water-Resistant Bluetooth Stereo Speaker",
+      "keyAttribute": "15 W",
+      "originalTitle": "AmazonBasics Bluetooth stereo speaker with water resistant design, 15 W, black.",
+      "brand": null,
+      "productType": "SPEAKERS",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "1.19 pounds",
+        "Dimensions": "7.5 inches × 2.3 inches × 2.5 inches"
+      },
+      "features": [
+        "Bluetooth compatible 15W speaker for indoor and outdoor use.",
+        "Connects to phones, tablets and other Bluetooth devices for high quality sound transmission",
+        "The rechargeable battery runs up to 7 hours at 80% volume after full charge.",
+        "The water-repellent structure protects against damage caused by moisture."
+      ],
+      "imageId": "81t5K135t9L",
+      "imagePath": "32/323669b9.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B01NC2W21T",
+      "sourceDomain": "amazon.com",
+      "categoryId": "fashion",
+      "displayName": "206 Collective Pioneer Moc-Toe Lace-up Boot",
+      "keyAttribute": "Brown leather",
+      "originalTitle": "Amazon Brand - 206 Collective Men's Pioneer Moc-Toe Lace-up Boot, Brown, 9.5 D US",
+      "brand": "206 Collective",
+      "productType": "SHOES",
+      "attributes": {
+        "Color": "Brown Leather",
+        "Weight": "13.5 ounces"
+      },
+      "features": [
+        "Hiker-inspired boot in rugged leather featuring padded collar and tongue and pull loop at counter",
+        "Removable insole"
+      ],
+      "imageId": "811e8nUYxZL",
+      "imagePath": "eb/ebd072f0.jpg",
+      "imageWidth": 2173,
+      "imageHeight": 1466
+    },
+    {
+      "sourceId": "B082VLYQWX",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Stone & Beam Westview Extra-Deep Leather Sofa",
+      "keyAttribute": "89\" wide, dark grey leather",
+      "originalTitle": "Amazon Brand – Stone & Beam Westview Extra-Deep Down-Filled Leather Sofa Couch, 89\"W, Dark Grey",
+      "brand": "Stone & Beam",
+      "productType": "SOFA",
+      "attributes": {
+        "Color": "Dark Grey",
+        "Material": "Leather",
+        "Weight": "136.24 pounds",
+        "Dimensions": "89 inches × 42.1 inches × 31.5 inches"
+      },
+      "features": [
+        "This couch, with its deep cushions and sturdy frame, will help you add maximum comfort and style to any living space in your home. Never believe that you have to sacrifice comfort for style—this couch has it both in spades.",
+        "89\"W x 42.1\"D x 31.5\"H",
+        "Solid wood frame and block legs with 100% top-grain leather and down-filled cushions",
+        "Seat and back cushions are filled with luxurious down."
+      ],
+      "imageId": "71+YMq06qWL",
+      "imagePath": "6b/6bfdcd13.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1165
+    },
+    {
+      "sourceId": "B07MFZDDB8",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "fashion",
+      "displayName": "find. Women's Simple Leather Low-Top Sneakers",
+      "keyAttribute": "Tan leather",
+      "originalTitle": "find. Women's Simple Leather Low-Top Sneakers, Tan, 9 US",
+      "brand": "find.",
+      "productType": "SHOES",
+      "attributes": {
+        "Color": "Tan",
+        "Model": "Simple Leather"
+      },
+      "features": [
+        "Designed in Europe - please refer to size chart for specific measurements to achieve the perfect fit"
+      ],
+      "imageId": "71ODNZGVvFL",
+      "imagePath": "0b/0ba75461.jpg",
+      "imageWidth": 1969,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B073Q9GT4N",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics Pre-Seasoned Cast Iron 5-Piece Cookware Set",
+      "keyAttribute": "Cast iron, 5 pieces",
+      "originalTitle": "AmazonBasics Pre-Seasoned Cast Iron 5-Piece Kitchen Cookware Set, Pots and Pans",
+      "brand": "AmazonBasics",
+      "productType": "KITCHEN",
+      "attributes": {
+        "Material": "Cast Iron",
+        "Model": "SX-5PC",
+        "Weight": "22.43 pounds",
+        "Dimensions": "14.2 inches × 12.2 inches × 10.6 inches"
+      },
+      "features": [
+        "Pre-seasoned cast iron set includes a 10.5-inch griddle, an 8-inch skillet, a 10.25-inch skillet, and a 10.25-inch Dutch oven with lid; oven safe to 500 degrees Fahrenheit",
+        "Cast iron for even heat distribution and retention; pre-seasoned products don't have non-stick function; hand wash only",
+        "Always use hot-pads, oven mitts, or potholders while moving or removing cast iron cookware on or from the stove or oven."
+      ],
+      "imageId": "81w6X1n93-L",
+      "imagePath": "f0/f0a46dcb.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1473
+    },
+    {
+      "sourceId": "B0731G364H",
+      "sourceDomain": "amazon.com",
+      "categoryId": "outdoors-fitness",
+      "displayName": "AmazonBasics Cast Iron Kettlebell, 10 lb",
+      "keyAttribute": "10 pounds",
+      "originalTitle": "AmazonBasics Cast Iron Kettlebell - 10 Pounds, Black",
+      "brand": "AmazonBasics",
+      "productType": "SPORTING_GOODS",
+      "attributes": {
+        "Weight": "10 pounds",
+        "Dimensions": "6.7 inches × 3.1 inches × 6.5 inches"
+      },
+      "features": [
+        "Kettlebell supports a wide range of resistance-training exercises",
+        "Made of solid high-quality cast iron for reliable built-to-last strength",
+        "Painted surface for increased durability and corrosion protection",
+        "Textured wide handle helps ensure a comfortable, secure grip; hold with one hand or two"
+      ],
+      "imageId": "716SMzWcD8L",
+      "imagePath": "2d/2de01d81.jpg",
+      "imageWidth": 1612,
+      "imageHeight": 1592
+    },
+    {
+      "sourceId": "B01MR9EEPR",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "fashion",
+      "displayName": "find. Men's Brushed Leather Desert Boots",
+      "keyAttribute": "Brushed leather uppers",
+      "originalTitle": "find. Men's Desert Boots with Brushed Leather and Lace-Ups",
+      "brand": "find.",
+      "productType": "SHOES",
+      "attributes": {
+        "Material": "Leather",
+        "Model": "Suede Casual Desert"
+      },
+      "features": [
+        "Brushed leather uppers",
+        "Lace-up fastening",
+        "Contrasting midweight sole",
+        "Soft leather inners"
+      ],
+      "imageId": "81F1E3z77oL",
+      "imagePath": "a4/a44fbdc2.jpg",
+      "imageWidth": 1969,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B0727XS1XC",
+      "sourceDomain": "amazon.sg",
+      "categoryId": "fashion",
+      "displayName": "AmazonBasics 20-inch Hardside Carry-on Spinner",
+      "keyAttribute": "20-inch, 7.72 lb",
+      "originalTitle": "AmazonBasics Hardside Spinner Luggage, 20-inch Carry-on/Cabin Size, Light Blue",
+      "brand": "AmazonBasics",
+      "productType": "SUITCASE",
+      "attributes": {
+        "Color": "Light Blue",
+        "Weight": "7.72 pounds",
+        "Dimensions": "15 inches × 10 inches × 21.6 inches"
+      },
+      "features": [
+        "20-inch hardside spinner luggage for weekend getaways or as international carry-on",
+        "Protective hard shell with scratch-resistant finish; made of extra-thick ABS (thicker than the competition) for enhanced strength and durability",
+        "Fully lined interior with divider; 150D-polyester interior organizer with 3 zippered pockets for conveniently storing smaller items",
+        "Expandable for up to 15% additional packing capacity; solid, strong zippers; telescoping handle for comfortable maneuvering; securely mounted short handle"
+      ],
+      "imageId": "91sB18RbslL",
+      "imagePath": "e1/e1fb1a18.jpg",
+      "imageWidth": 1187,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07CM5NZRC",
+      "sourceDomain": "amazon.com",
+      "categoryId": "computing",
+      "displayName": "AmazonBasics Wireless Keyboard with Touchpad",
+      "keyAttribute": "For smart TVs, US layout",
+      "originalTitle": "AmazonBasics Wireless Keyboard with Touchpad for Smart TV - US Layout (QWERTY)",
+      "brand": "AmazonBasics",
+      "productType": "COMPUTER_ADD_ON",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "0.72 pounds",
+        "Dimensions": "5 inches × 14.7 inches × 0.9 inches"
+      },
+      "features": [
+        "All-in-one wireless (non-bluetooth) keyboard with touchpad for easily navigating your smart TV-connected PC",
+        "Slim design works well in the living room; 10-meter (33-foot) wireless range promotes a reliable connection even in larger rooms",
+        "Keyboard with familiar US layout (QWERTY) and handy media keys; large integrated touchpad—use 2 fingers to scroll up/down or left/right and pinch out to zoom in or pinch in to zoom out",
+        "Plug-and-play design with USB receiver for simple set-up; compatible with Windows 7, 8, 10; Chrome OS; Mac OS; and Smart TVs that support HID technology. Note that the provided connector is USB-A, if your device only supports USB-C an additional adapter will be required."
+      ],
+      "imageId": "81vFhqlqGsL",
+      "imagePath": "a1/a1fdad5e.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07Y1RV1PX",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics K-Cup Coffee Maker",
+      "keyAttribute": "Single-serve pod machine",
+      "originalTitle": "AmazonBasics K-Cup Coffee Maker",
+      "brand": "AmazonBasics",
+      "productType": "KITCHEN",
+      "attributes": {},
+      "features": [],
+      "imageId": "712aPQwcEaL",
+      "imagePath": "04/04d99540.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B082BL4G1J",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Rivet Bertha Velvet Swivel Office Chair",
+      "keyAttribute": "Olive green velvet, gold finish",
+      "originalTitle": "Amazon Brand – Rivet Bertha Mid-Century Velvet-Upholstered Swivel Office Chair, 25.25\"W, Olive Green with Gold Finish",
+      "brand": "Rivet",
+      "productType": "CHAIR",
+      "attributes": {
+        "Color": "Olive Green",
+        "Material": "Velvet",
+        "Weight": "34.83 pounds",
+        "Dimensions": "25 inches × 25.3 inches × 35.8 inches"
+      },
+      "features": [
+        "This olive-green velvet chair has an unusual, squared-off silhouette that will add a stylish mid-century flair to any workplace or home office. Its adjustable height, casters, and smooth swivel mechanism make it as flexible as it is attractive.",
+        "25.25\"W x 25\"D x 32.75\"–35.75\"H; seat height: 19.75\"–22.75\"",
+        "Generously padded cushions are upholstered in a soft olive-green velvet that adds a touch of luxury to a workday necessity.",
+        "This chair has a 360-degree swivel mechanism with height and tension adjustments to accommodate your work style."
+      ],
+      "imageId": "71VHQwEYbIL",
+      "imagePath": "87/873f2c06.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07QD6V1VT",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Rivet Classic Desk",
+      "keyAttribute": "39.4\" wide, dark espresso",
+      "originalTitle": "Amazon Brand – Rivet Classic Desk, 39.4\"W, Dark Espresso",
+      "brand": "Rivet",
+      "productType": "DESK",
+      "attributes": {
+        "Color": "Dark Espresso",
+        "Material": "Engineered Wood",
+        "Weight": "38 pounds",
+        "Dimensions": "39.4 inches × 21.6 inches × 30 inches"
+      },
+      "features": [
+        "The clean lines and dark brown finish of this pine desk bring a classic distinction to your home office or living space. Generous desktop provides plenty of room for writing or using a laptop.",
+        "39.4''W x 21.6''D x 30''H",
+        "Solid pine and MDF",
+        "This pine desk combines style and function to provide ample space for your home office needs."
+      ],
+      "imageId": "71arjf0rbxL",
+      "imagePath": "33/33fd2709.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2048
+    },
+    {
+      "sourceId": "B07C2DB8MM",
+      "sourceDomain": "amazon.de",
+      "categoryId": "outdoors-fitness",
+      "displayName": "EONO Essentials Ultra-Light Hiking Backpack",
+      "keyAttribute": "Waterproof, inner frame",
+      "originalTitle": "EONO Essentials Waterproof Ultra-Light Hiking Backpack with Inner Frame and Breathable Mesh Back",
+      "brand": null,
+      "productType": "SPORTING_GOODS",
+      "attributes": {
+        "Dimensions": "12.2 inches × 2 inches × 20 inches"
+      },
+      "features": [],
+      "imageId": "719izevvAYL",
+      "imagePath": "3d/3d323126.jpg",
+      "imageWidth": 1500,
+      "imageHeight": 1500
+    },
+    {
+      "sourceId": "B07DBDV3FH",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Ravenna Home Swing Arm Floor Lamp",
+      "keyAttribute": "58\" tall, brushed steel",
+      "originalTitle": "Amazon Brand – Ravenna Home Swing Arm Living Room Floor Lamp With LED Light Bulb - 58 Inches, Brushed Steel",
+      "brand": "Ravenna Home",
+      "productType": "LAMP",
+      "attributes": {
+        "Color": "Brushed Steel",
+        "Weight": "9.9 pounds",
+        "Dimensions": "15.8 inches × 15.8 inches × 15.3 inches"
+      },
+      "features": [
+        "A traditional floor lamp with swing arm marries style and function",
+        "Metal base and swing arm with brushed nickel finish; off-white linen hardback shade",
+        "LED bulb included",
+        "Dimensions: 14.00\"W x 20.00\"D x 58.00\"H"
+      ],
+      "imageId": "41YZdSq2qBL",
+      "imagePath": "98/981466b0.jpg",
+      "imageWidth": 1010,
+      "imageHeight": 1010
+    },
+    {
+      "sourceId": "B07348JQ3L",
+      "sourceDomain": "amazon.com",
+      "categoryId": "gaming",
+      "displayName": "AmazonBasics Joy-Con Charging Station",
+      "keyAttribute": "Charges up to 4 Joy-Cons",
+      "originalTitle": "AmazonBasics Charging Station Dock for 4 Nintendo Switch Joy-con Controllers - 2.6 Foot Cable, Black",
+      "brand": "AmazonBasics",
+      "productType": "VIDEO_GAME_ACCESSORIES",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "0.91 pounds",
+        "Dimensions": "6.1 inches × 5.2 inches × 3.9 inches"
+      },
+      "features": [
+        "Charging station for Nintendo Switch Joy-Con controllers; charges up to 4 Joy-Cons at a time (Joy-Con controllers not included)",
+        "Charges all 4 controllers in about 3.5 to 4 hours; 4 individual LED charging indicators (red for charging; green for fully charged)",
+        "Over-current and over-voltage protection; anti-slip base with 4 rubber feet for stability",
+        "2.6-foot fixed USB-A cable; plug USB cord into a power supply or Nintendo Switch dock to activate charging"
+      ],
+      "imageId": "71SQSraI7rL",
+      "imagePath": "d3/d32e2d7d.jpg",
+      "imageWidth": 2008,
+      "imageHeight": 1916
+    },
+    {
+      "sourceId": "B07HNJFGH4",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "outdoors-fitness",
+      "displayName": "UMI. Essentials Ultralight Folding Camping Chair",
+      "keyAttribute": "265 lb capacity",
+      "originalTitle": "UMI. Essentials Portable Camping Chair Compact Ultralight Folding Chair with Carry Bag for Hiking, Beach,Fishing,Outdoor Heavy Duty 265 lb Capacity Red",
+      "brand": "UMI",
+      "productType": "CHAIR",
+      "attributes": {
+        "Color": "Red",
+        "Material": "Mesh"
+      },
+      "features": [
+        "COMFORT: This is a ergonomic chair. High off the Ground. Deeper Seat makes you feel surrounded and very relaxed. Mesh Panels on the back and sides allow for increased airflow to keep you cool even in wet, hot environments.",
+        "DURABLE AND STURDY: Seat fabric is windproof and waterproof, thick and durable. You will feel sturdy and safe sitting on it for the frame is made of high strength aluminum alloy.Includes TerraGrip Feet- the chair WON'T SINK IN SAND OR MUD.",
+        "MULTI-FUNCTION POCKET DESIGN:There are total three pockets on the front side and on both sides, which can be equipped with water cup, mobile phone, iPad, etc. No need to worry about where things are placed.",
+        "SET UP IN SECONDS: The frame system is divergent on one main rack.With elastic ropes inside,frames can be connected naturally and quickly. The seat fabric with a thoughtful pull-tab design will fit easily with just four corners."
+      ],
+      "imageId": "71vms9Y4tAL",
+      "imagePath": "21/2140dd12.jpg",
+      "imageWidth": 1000,
+      "imageHeight": 1200
+    },
+    {
+      "sourceId": "B07QX2BYDH",
+      "sourceDomain": "amazon.com",
+      "categoryId": "gaming",
+      "displayName": "AmazonBasics Gaming Computer Desk",
+      "keyAttribute": "Controller, headphone and speaker storage",
+      "originalTitle": "AmazonBasics Gaming Computer Desk with Storage for Controller, Headphone & Speaker - Black",
+      "brand": "AmazonBasics",
+      "productType": "DESK",
+      "attributes": {
+        "Color": "Black",
+        "Material": "Metal",
+        "Model": "AmazonBasics Gaming Computer Desk with Storage for Controller, Headphone & Speaker - Black",
+        "Weight": "33.38 pounds",
+        "Dimensions": "51 inches × 23.4 inches × 35.8 inches"
+      },
+      "features": [
+        "Computer desk designed for avid computer gamer and online multi-player fans",
+        "Steel K-leg design to complement modern lifestyle and provide extra stability",
+        "Equipped with multiple storage holder compartments for controllers, headphones, speakers and drink cup",
+        "Attached with 5-slot game storage shelf, under-desk basket and a generous charging station for smartphone or tablets"
+      ],
+      "imageId": "81Hk+ygGWdL",
+      "imagePath": "6c/6cb33140.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B087X76Z3W",
+      "sourceDomain": "amazon.in",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonCommercial Electric Gooseneck Kettle",
+      "keyAttribute": "Black stainless steel",
+      "originalTitle": "AmazonCommercial Black Stainless Steel Electric Gooseneck Kettle",
+      "brand": "Amazon Commercial",
+      "productType": "ELECTRIC_WATER_BOILER",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "2.31 pounds",
+        "Dimensions": "11.1 inches × 5.8 inches × 8.6 inches"
+      },
+      "features": [],
+      "imageId": "71XWyAWig6L",
+      "imagePath": "7e/7ee7d70a.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B075ZF4S39",
+      "sourceDomain": "amazon.com",
+      "categoryId": "books-hobbies",
+      "displayName": "Stone & Beam Barrett Reclaimed Wood 4-Shelf Bookcase",
+      "keyAttribute": "40\" wide, 74\" tall",
+      "originalTitle": "Amazon Brand – Stone & Beam Barrett Reclaimed Wood 4-Shelf Bookcase, 40\"W, White and Sandstone Pine",
+      "brand": "Stone & Beam",
+      "productType": "SHELF",
+      "attributes": {
+        "Color": "White/Brown",
+        "Material": "wood",
+        "Weight": "84 pounds",
+        "Dimensions": "40 inches × 15 inches × 74 inches"
+      },
+      "features": [
+        "40\"W x 15\"D x 74”H",
+        "Solid, recycled pine wood with natural imperfections for rustic touch",
+        "Five wide shelves provide generous display and storage space.",
+        "Display your prized family photos or works by your favorite authors on this rustic bookshelf. Influenced by early Americana style, it's made of recycled and reclaimed wood in a white and weathered sandstone finish that adds old world charm."
+      ],
+      "imageId": "81hYIzK+q8L",
+      "imagePath": "46/466292e2.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B01LP0V4JY",
+      "sourceDomain": "amazon.com",
+      "categoryId": "outdoors-fitness",
+      "displayName": "AmazonBasics Extra Thick Exercise Yoga Mat",
+      "keyAttribute": "½-inch thick, 74 × 24 in",
+      "originalTitle": "AmazonBasics Extra Thick Exercise Yoga Gym Floor Mat with Carrying Strap - 74 x 24 x .5 Inches, Blue",
+      "brand": "AmazonBasics",
+      "productType": "EXERCISE_MAT",
+      "attributes": {
+        "Color": "Blue",
+        "Material": "Synthetic",
+        "Model": "AmazonBasics 1/2-Inch Extra Thick Exercise Mat with Carrying Strap, Blue",
+        "Weight": "2.35 pounds",
+        "Dimensions": "74 inches × 24 inches × 0.5 inches"
+      },
+      "features": [
+        "Exercise mat for yoga, pilates, and other workout routines",
+        "Textured surface for enhanced traction",
+        "1/2-inch, extra-thick yoga mat for comfortable, cushioning support",
+        "Made of lightweight, durable foam"
+      ],
+      "imageId": "81NAFYPZYvL",
+      "imagePath": "e7/e77453e8.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1716
+    },
+    {
+      "sourceId": "B075ZBW1RR",
+      "sourceDomain": "amazon.com",
+      "categoryId": "books-hobbies",
+      "displayName": "Stone & Beam Larson Wood and Metal 2-Shelf Bookcase",
+      "keyAttribute": "39\" tall, walnut",
+      "originalTitle": "Amazon Brand – Stone & Beam Larson Industrial Wood and Metal 2-Shelf Bookcase, 39\"H, Walnut",
+      "brand": "Stone & Beam",
+      "productType": "SHELF",
+      "attributes": {
+        "Color": "Walnut + Metal",
+        "Material": "walnut",
+        "Weight": "19 pounds",
+        "Dimensions": "14 inches × 34 inches × 39.3 inches"
+      },
+      "features": [
+        "34\"L x 14\"W x 39.25\"H",
+        "Solid pine wood shelves and top; metal legs",
+        "Industrial and rustic touches allow this bookshelf to blend with many styles.",
+        "Two fixed distressed wood shelves with a walnut finish"
+      ],
+      "imageId": "81X30ETu4eL",
+      "imagePath": "d5/d581c685.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B000UCZFSU",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "Pinzon 8-Cup Coffee Press",
+      "keyAttribute": "8 cups",
+      "originalTitle": "Pinzon 8 Cup Coffee press - Metalic Red",
+      "brand": "Pinzon by Amazon",
+      "productType": "KITCHEN",
+      "attributes": {},
+      "features": [
+        "An Amazon Brand"
+      ],
+      "imageId": "819LQ3GfDrS",
+      "imagePath": "b0/b07d131f.jpg",
+      "imageWidth": 1747,
+      "imageHeight": 2500
+    },
+    {
+      "sourceId": "B01FJFWFO4",
+      "sourceDomain": "amazon.com",
+      "categoryId": "photography",
+      "displayName": "AmazonBasics UV and Circular Polarizer Lens Filter Set",
+      "keyAttribute": "72 mm",
+      "originalTitle": "AmazonBasics UV Protection Lens Filter and Circular Polarizer Lens Set - 72 mm",
+      "brand": "AmazonBasics",
+      "productType": "CAMERA_LENS_FILTERS",
+      "attributes": {},
+      "features": [
+        "Includes an AmazonBasics UV Protection Lens Filter (72mm) and an AmazonBasics Circular Polarizer Lens (72mm)",
+        "UV protection filter for general, everyday use reduces ultraviolet light and helps eliminate blush cast in images",
+        "Circular polarizer is one of the most popular special-effect filters; Deepens the intensity of blue skies and reduces or eliminates glare",
+        "Multi-coating on polarizer reduces reflection; Great for outdoor photography"
+      ],
+      "imageId": "5129myMrfYL",
+      "imagePath": "1a/1a4ae710.jpg",
+      "imageWidth": 1001,
+      "imageHeight": 1001
+    },
+    {
+      "sourceId": "B07GKFT4W4",
+      "sourceDomain": "amazon.in",
+      "categoryId": "outdoors-fitness",
+      "displayName": "Solimo Large Yoga Foam Roller",
+      "keyAttribute": "Foam",
+      "originalTitle": "Amazon Brand - Solimo Yoga Foam Roller, Large (Green)",
+      "brand": "Amazon Brand - Solimo",
+      "productType": "SPORTING_GOODS",
+      "attributes": {
+        "Color": "Green",
+        "Material": "Foam",
+        "Dimensions": "455 millimeters × 152 millimeters × 150 millimeters"
+      },
+      "features": [
+        "Sturdy foam roller ideal for your daily exercises",
+        "Suitable for use during yoga, pilates or for massaging muscles",
+        "Made of ABS keeping the frame sturdy and durable, and EVA foam giving the roller optimum softness",
+        "Lightweight roller convenient for daily use"
+      ],
+      "imageId": "71YNxa-qFlL",
+      "imagePath": "2d/2d9e020a.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B06WWJJPRW",
+      "sourceDomain": "amazon.com",
+      "categoryId": "computing",
+      "displayName": "AmazonBasics Monitor Arm with Laptop Tray",
+      "keyAttribute": "Aluminum, lift-engine arm",
+      "originalTitle": "AmazonBasics Premium Single Monitor Stand - Lift Engine Arm Mount, Aluminum - Black Bundle with AmazonBasics Notebook Laptop Stand Arm Mount Tray",
+      "brand": "AmazonBasics",
+      "productType": "COMPUTER",
+      "attributes": {
+        "Color": "Black",
+        "Material": "aluminum"
+      },
+      "features": [
+        "Product 1: Single monitor arm adjusts effortlessly for easy use",
+        "Product 1: Arm extends and retracts, tilt to change reading angles, and rotate from landscape-to-portrait mode; tilt range 70° back and 5° forward",
+        "Product 1: Increases desktop space (desk clamp fits desks between 0.4” up to 2.4”); ergonomic positioning for reduced strain",
+        "Product 1: works with almost any LCD monitor measuring 32 inches or smaller."
+      ],
+      "imageId": "51zlU7+sWEL",
+      "imagePath": "52/52d04628.jpg",
+      "imageWidth": 1001,
+      "imageHeight": 1001
+    },
+    {
+      "sourceId": "B084ZH769P",
+      "sourceDomain": "amazon.in",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics 12-Cup Coffee Maker",
+      "keyAttribute": "Reusable filter",
+      "originalTitle": "AmazonBasics 12-Cup Coffee Maker with Reusable Filter, Black and Stainless Steel",
+      "brand": "AmazonBasics",
+      "productType": "COFFEE_MAKER",
+      "attributes": {
+        "Weight": "2.91 pounds",
+        "Dimensions": "11.8 inches × 7.1 inches × 12.1 inches"
+      },
+      "features": [],
+      "imageId": "717WxwMxNML",
+      "imagePath": "23/234ab13c.jpg",
+      "imageWidth": 1858,
+      "imageHeight": 1858
+    },
+    {
+      "sourceId": "B079LD81KC",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "outdoors-fitness",
+      "displayName": "AmazonBasics Medium Weather Envelope Sleeping Bag",
+      "keyAttribute": "Fits up to 5'11\"",
+      "originalTitle": "AmazonBasics Medium Weather Camping Envelope Sleeping Bag With Tote - 75 x 33 x 2 Inches, Blue",
+      "brand": "AmazonBasics",
+      "productType": "SLEEPING_BAG",
+      "attributes": {
+        "Material": "150D Poly &Velvet",
+        "Model": "AmazonBasics Weather Camping Envelope Sleeping Bag With Tote",
+        "Weight": "5.29 pounds",
+        "Dimensions": "75 inches × 33 inches × 2 inches"
+      },
+      "features": [
+        "Adult-size sleeping bag fits most people up to 5 feet 11 inches tall",
+        "envelope style (rectangular)",
+        "For camping in medium temperatures (between 30 and 50 degrees F)",
+        "Made of 100% polyester with a 100% polyester fill"
+      ],
+      "imageId": "81lwga3GVEL",
+      "imagePath": "aa/aa824349.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2045
+    },
+    {
+      "sourceId": "B075XV4CFN",
+      "sourceDomain": "amazon.com",
+      "categoryId": "computing",
+      "displayName": "AmazonBasics Portable Power Bank, 6,700 mAh",
+      "keyAttribute": "6,700 mAh",
+      "originalTitle": "AmazonBasics Portable Charger/Power Bank, 6,700 mAh, Blue",
+      "brand": "AmazonBasics",
+      "productType": "WIRELESS_ACCESSORY",
+      "attributes": {
+        "Color": "Blue",
+        "Weight": "0.27 pounds",
+        "Dimensions": "3.8 inches × 1.7 inches × 0.9 inches"
+      },
+      "features": [
+        "Compact 6,700 mAh portable charger (powered with LG batteries); charges smartphones and other portable devices through the USB port; compatible with Apple and Android devices",
+        "Fully charges an Apple iPhone 8 twice before needing to be recharged; battery-level indicator with 4 LEDs; 4-hour recharging time for power bank (via 2A charger)",
+        "UL-2056 certified; advanced safety features include overload protection, short-circuit protection, over-charge protection, over-discharge protection, over-voltage and under-voltage input protection, and input/output over-temperature protection",
+        "Includes micro USB charger cable, carrying pouch, and user manual; for best results in charging your device, use the cable that came with your device or use a cable that has been certified to work with your device; note: does not support Qualcomm Quick Charge"
+      ],
+      "imageId": "71nr4p8mK-L",
+      "imagePath": "e6/e6d0b253.jpg",
+      "imageWidth": 2193,
+      "imageHeight": 1385
+    },
+    {
+      "sourceId": "B07KS37249",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "photography",
+      "displayName": "AmazonBasics DSLR/Mirrorless Camera Bag and Tripod Kit",
+      "keyAttribute": "Bag and tripod",
+      "originalTitle": "DSLR/Mirrorless Camera Accessory Kit - AmazonBasics Bag and Tripod (Gray Interior Bag)",
+      "brand": "AmazonBasics",
+      "productType": "CAMERA_BAGS_AND_CASES",
+      "attributes": {
+        "Color": "Gray Interior"
+      },
+      "features": [
+        "Store, carry and protect your camera equipment",
+        "Slot for iPad Mini, Google Nexus 7, Amazon Kindle Fire",
+        "Holds 1 DSLR body and 2 lenses",
+        "Adjustable-height tripod made of lightweight aluminum; weighs just over a pound"
+      ],
+      "imageId": "51scOP4r27L",
+      "imagePath": "4a/4af5a911.jpg",
+      "imageWidth": 1001,
+      "imageHeight": 1001
+    },
+    {
+      "sourceId": "B07WTRFSMB",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "books-hobbies",
+      "displayName": "AmazonBasics Guitar Foot Stool",
+      "keyAttribute": "1.54 lb, folding",
+      "originalTitle": "AmazonBasics Guitar Foot Stool",
+      "brand": "AmazonBasics",
+      "productType": "INSTRUMENT_PARTS_AND_ACCESSORIES",
+      "attributes": {
+        "Weight": "1.54 pounds",
+        "Dimensions": "10 inches × 4.1 inches × 7.1 inches"
+      },
+      "features": [
+        "Guitar foot stool supports a more comfortable playing position when sitting in a chair",
+        "4-level height adjustment from 5.1 inches (13cm) up to 9.8 inches (25cm); can be easily lowered or raised",
+        "Durable metal frame for reliable strength; sleek black finish; non-slip rubber pad keeps the foot stool in place during use",
+        "Sets up in seconds and folds flat for compact storage or convenient travel"
+      ],
+      "imageId": "71X4qWoFQXL",
+      "imagePath": "6e/6e596786.jpg",
+      "imageWidth": 1700,
+      "imageHeight": 2071
+    },
+    {
+      "sourceId": "B07BL636P7",
+      "sourceDomain": "amazon.com",
+      "categoryId": "fashion",
+      "displayName": "AmazonBasics 23-inch Expandable Softside Carry-On",
+      "keyAttribute": "TSA lock, spinner wheels",
+      "originalTitle": "AmazonBasics Expandable Softside Carry-On Spinner Luggage Suitcase With TSA Lock And Wheels - 23 Inch, Purple",
+      "brand": "AmazonBasics",
+      "productType": "SUITCASE",
+      "attributes": {
+        "Color": "Purple",
+        "Weight": "7.19 pounds",
+        "Dimensions": "15.7 inches × 9 inches × 23.2 inches"
+      },
+      "features": [
+        "Outer dimensions (including wheels): 15.7 x 9 x 23.2 Inches; Interior dimensions: 14.5 x 7.8 x 19.2 Inches",
+        "Interior capacity: 36 Liters",
+        "Weight: 7.19 lbs.",
+        "Premium 23-inch carry-on softside spinner for savvy travelers; built-in TSA lock provides an added level of security"
+      ],
+      "imageId": "813Fu21wS8L",
+      "imagePath": "80/809b7276.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B076N5V6LN",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "outdoors-fitness",
+      "displayName": "AmazonBasics Pop-Up Canopy Tent, 10 × 10 ft",
+      "keyAttribute": "99% UV protection",
+      "originalTitle": "AmazonBasics Pop-Up Canopy Tent, 10 x 10 Foot, Grey",
+      "brand": "AmazonBasics",
+      "productType": "FREESTANDING_SHELTER",
+      "attributes": {
+        "Color": "Grey",
+        "Material": "Polyester",
+        "Weight": "40.7 pounds",
+        "Dimensions": "118.1 inches × 118.1 inches × 96.5 inches"
+      },
+      "features": [
+        "99% UV POTECTION",
+        "300D(130G/M2) polyester WITH SILVER",
+        "300X 600D polyester carry bag with wheel"
+      ],
+      "imageId": "71D8ISqgL8L",
+      "imagePath": "cf/cfc7b0fd.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2080
+    },
+    {
+      "sourceId": "B07FP2TP8T",
+      "sourceDomain": "amazon.com",
+      "categoryId": "outdoors-fitness",
+      "displayName": "AmazonBasics Vinyl Dumbbells, 6 lb Pair",
+      "keyAttribute": "Set of 2 × 6 lb",
+      "originalTitle": "AmazonBasics Vinyl 6 Pound Dumbbells - Set of 2, Orange",
+      "brand": "AmazonBasics",
+      "productType": "SPORTING_GOODS",
+      "attributes": {
+        "Color": "Orange",
+        "Material": "Steel;Vinyl",
+        "Weight": "12 pounds",
+        "Dimensions": "3.4 inches × 7.6 inches × 3.1 inches"
+      },
+      "features": [
+        "Set of 2 dumbbells, 6 pounds each",
+        "Steel dumbbell with colorful vinyl exterior coating for a strong, non-slip grip",
+        "Great for intensifying workouts such as walking, jogging, aerobics, and more",
+        "Available in a variety of different weights for training"
+      ],
+      "imageId": "61adXDb6WdL",
+      "imagePath": "aa/aa32cab9.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1474
+    },
+    {
+      "sourceId": "B07TXPFTHG",
+      "sourceDomain": "amazon.com",
+      "categoryId": "vehicles",
+      "displayName": "AmazonCommercial Digital Tire Pressure Gauge",
+      "keyAttribute": "Inflator with gauge",
+      "originalTitle": "AmazonCommercial GAC-TI-001 Digital Tire Pressure Gauge",
+      "brand": "AmazonCommercial",
+      "productType": "AUTO_ACCESSORY",
+      "attributes": {
+        "Model": "GAC-TI-001",
+        "Weight": "1.41 pounds",
+        "Dimensions": "23.5 inches × 10.6 inches × 7.9 inches"
+      },
+      "features": [
+        "Digital tire pressure gauge inflator for inflating tires and monitoring air pressure; suitable for all car, truck, and motorcycle tires",
+        "Shockproof design with AC107 brass 1/4-inch NPT air chuck that connects securely to valves; inlet/outlet: 1/4-inch male NPT and 1/4-inch female NPT",
+        "TPMS of bar, psi, kpa, and kgf; supremely accurate (±0.01bar / ±0.1psi); scale/inflation range: 0.2-12 bar / 3-175 psi / 20-1206 kpa / 0.2-12.3 kg/cm²",
+        "Maximum inlet air supply pressure: 15 bar, 218 psi, 1500 kpa, and 15 kgf; OlayFlex 24.4-inch hose; runs on 2 AAA batteries (CR2450, with 2.4 -3.6V DC range)"
+      ],
+      "imageId": "71gtORskprL",
+      "imagePath": "45/4541ec02.jpg",
+      "imageWidth": 2000,
+      "imageHeight": 1865
+    },
+    {
+      "sourceId": "B07ST1Y3TN",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics 2-Slot Toaster",
+      "keyAttribute": "2 slots",
+      "originalTitle": "AmazonBasics 2-Slot Toaster, White",
+      "brand": "AmazonBasics",
+      "productType": "TOASTER",
+      "attributes": {
+        "Color": "White",
+        "Weight": "3 pounds",
+        "Dimensions": "12.1 inches × 7.3 inches × 7.8 inches"
+      },
+      "features": [
+        "2-slot toaster for toasting bread, bagels, english muffins, and more",
+        "Toasts quickly and evenly for perfect results each time",
+        "6 browning settings to choose from for your favorite level of toasting",
+        "Multifunctional controls for bagels, defrost mode, and quick-cancel"
+      ],
+      "imageId": "71u6TIuxd5L",
+      "imagePath": "5a/5ab6e7f4.jpg",
+      "imageWidth": 2231,
+      "imageHeight": 2231
+    },
+    {
+      "sourceId": "B013R5T9UQ",
+      "sourceDomain": "amazon.de",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics 1.5 L Ice-Crushing Blender",
+      "keyAttribute": "550 W, glass jar",
+      "originalTitle": "AmazonBasics 1.5 Litre Ice-Crushing Blender - Black",
+      "brand": null,
+      "productType": "FOOD_BLENDER",
+      "attributes": {
+        "Material": "Glass",
+        "Weight": "3.17 kilograms",
+        "Dimensions": "20.5 centimeters × 17.9 centimeters × 36.8 centimeters"
+      },
+      "features": [
+        "550-watt ice-crushing blender with 1.5-litre glass jar",
+        "2 speeds (low or high), plus pulse; sharp stainless-steel blade",
+        "Measuring marks, easy-grip handle, and drip-free pouring spout",
+        "Lid with integrated measuring cup, refill opening, and rubber stopper"
+      ],
+      "imageId": "81juw8LaZuL",
+      "imagePath": "fd/fd594467.jpg",
+      "imageWidth": 1392,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B081W37RZW",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "books-hobbies",
+      "displayName": "AmazonBasics 3-in-1 Metronome Tuner",
+      "keyAttribute": "Guitar, bass, violin, ukulele",
+      "originalTitle": "AmazonBasics 3 in 1 Metronome Tuner - Designed for Guitar, Bass, Violin and Ukulele",
+      "brand": "AmazonBasics",
+      "productType": "INSTRUMENT_PARTS_AND_ACCESSORIES",
+      "attributes": {
+        "Weight": "0.15 pounds",
+        "Dimensions": "4 inches × 0.2 inches × 2.6 inches"
+      },
+      "features": [
+        "3-in-1 metronome, tuner, and tone generator for use with any musical instrument; ideal for a guitar, bass, ukulele, or violin",
+        "Metronome provides a precise tempo, a tempo range of 30 - 250 beats per minute (bpm), and an electronic metronome sound",
+        "Tuner offers a wide range (A0-C8), flat tuning, and multiple tuning modes (chromatic, guitar, bass, ukulele, and violin) for versatility, plus auto and manual tuning, an LCD display with LED indicators, and 2 detection methods (mic and line-in)",
+        "Precise tone generator provides a reference tone range of chromatic 2A - 6A; device turns off automatically after 3 minutes if no signal; freely rotates 360 degrees for easy access; battery powered (batteries not included)"
+      ],
+      "imageId": "71DAEGGV54L",
+      "imagePath": "80/80f6ef75.jpg",
+      "imageWidth": 1820,
+      "imageHeight": 1820
+    },
+    {
+      "sourceId": "B0752X35TD",
+      "sourceDomain": "amazon.com",
+      "categoryId": "computing",
+      "displayName": "AmazonBasics Wireless Mouse with Mini Mouse Pad",
+      "keyAttribute": "Nano receiver",
+      "originalTitle": "AmazonBasics Wireless Mouse with Nano Receiver and Mini Gaming Mouse Pad, Blue",
+      "brand": "AmazonBasics",
+      "productType": "INPUT_MOUSE",
+      "attributes": {
+        "Color": "Blue"
+      },
+      "features": [
+        "Smooth, precise and affordable wireless optical 3-button mouse with nano receiver for laptop, desktop and netbook PCs",
+        "2.4 GHz wireless provides a powerful, reliable connection",
+        "Nano-receiver stays in the PC USB port or stows conveniently inside the wireless mouse when not in use (note: Receiver is stored within the mouse from production and needs to be removed upon setup)",
+        "Mini gaming mouse pad-ideal for gamers, graphic designers, or anyone who uses a mouse"
+      ],
+      "imageId": "517oIaNBjxL",
+      "imagePath": "bb/bbf7bc5f.jpg",
+      "imageWidth": 1001,
+      "imageHeight": 1001
+    },
+    {
+      "sourceId": "B01LQX0P8Q",
+      "sourceDomain": "amazon.com.au",
+      "categoryId": "photography",
+      "displayName": "AmazonBasics 70-Inch Pistol Grip Tripod",
+      "keyAttribute": "Aluminum legs, with bag",
+      "originalTitle": "AmazonBasics 70-Inch Pistol Grip Tripod with Bag",
+      "brand": "AmazonBasics",
+      "productType": "CAMERA_TRIPOD",
+      "attributes": {
+        "Material": "Metal",
+        "Weight": "6.99 pounds",
+        "Dimensions": "35.6 inches × 4.2 inches × 4.9 inches"
+      },
+      "features": [
+        "Pistol grip tripod with adjustable-height aluminum legs and rubber feet with retractable metal spikes for outdoor use",
+        "Recommended max load weight is 11 lbs (5kg) for optimal performance",
+        "Extends from 34.4 inches to 72.6 inches",
+        "Pistol grip design allows for camera placement in virtually any position including 90-degree angles"
+      ],
+      "imageId": "61sZRQp1vKL",
+      "imagePath": "16/168c5c97.jpg",
+      "imageWidth": 1289,
+      "imageHeight": 1574
+    },
+    {
+      "sourceId": "B07CPD2H9Z",
+      "sourceDomain": "primenow.amazon.co.uk",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics Titanium Non-Stick Induction Frying Pan",
+      "keyAttribute": "28 cm",
+      "originalTitle": "Amazonbasics Titanium Plasma Non Stick Induction Frying Pan, 28cm, with Heat-Resistant handle, PFOA&BPA Free",
+      "brand": "AmazonBasics",
+      "productType": "SAUTE_FRY_PAN",
+      "attributes": {
+        "Weight": "1.85 pounds",
+        "Dimensions": "19 inches × 3.5 inches × 11.2 inches"
+      },
+      "features": [
+        "Nonstick open frying pan (28cm x 5.0cm) with a wide flat base and gently flared sides for easy flipping and turning",
+        "Made of aluminium for fast, efficient heating; titanium-plasma and dakin nonstick coating for effortless food release",
+        "Stay-cool Bakelite handle for comfortable lifting and carrying, hole offers convenient hanging-storage option",
+        "Suitable for all heat sources, including induction, oven-safe up to 175° C"
+      ],
+      "imageId": "81nSGY2cTDL",
+      "imagePath": "97/972a4c59.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B01JAFFL4A",
+      "sourceDomain": "primenow.amazon.co.uk",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Over-Ear Wireless RF Headphones",
+      "keyAttribute": "Charging dock, for TV/hi-fi",
+      "originalTitle": "AmazonBasics Over-Ear Wireless RF Headphones with Charging Dock",
+      "brand": "AmazonBasics",
+      "productType": "HEADPHONES",
+      "attributes": {
+        "Model": "HS-RF02",
+        "Weight": "1.45 pounds",
+        "Dimensions": "7.6 inches × 5.3 inches × 8.5 inches"
+      },
+      "features": [
+        "Wireless, lightweight, over-ear RF headphones for extended listening of TV and hi-fi audio—without disturbing others",
+        "Interference-free reception up to 45 feet - through walls, ceilings and outdoors",
+        "Please note - these headphones are NOT compatible with Bluetooth technology",
+        "User-friendly on/off, volume control and LED indicator lights; dual 1.5-inch full-range neodymium drivers for high sound quality"
+      ],
+      "imageId": "71rYEgpka2L",
+      "imagePath": "e3/e3e4cc9a.jpg",
+      "imageWidth": 1379,
+      "imageHeight": 1536
+    },
+    {
+      "sourceId": "B07ZVZFLZ1",
+      "sourceDomain": "amazon.com",
+      "categoryId": "books-hobbies",
+      "displayName": "AmazonBasics Boost Guitar Effect Pedal",
+      "keyAttribute": "True bypass, metal shell",
+      "originalTitle": "AmazonBasics Boost Guitar Effect Pedal - True Bypass, Full Metal Shell",
+      "brand": "AmazonBasics",
+      "productType": "INSTRUMENT_PARTS_AND_ACCESSORIES",
+      "attributes": {
+        "Dimensions": "3.7 inches × 2.1 inches × 2.1 inches"
+      },
+      "features": [
+        "Boost guitar effect pedal; allows for increasing the volume without coloring the sound",
+        "True bypass; built-in 2-band EQ controls high and low frequency separately",
+        "Full metal shell made of aluminum alloy; silver-colored finish; anti-skid rubber pads on the backside for stability and to prevent friction",
+        "LED status indicator; user manual included; no batteries needed; powered by an AC adapter (not included)"
+      ],
+      "imageId": "71VJUV-7RJL",
+      "imagePath": "f6/f624ea27.jpg",
+      "imageWidth": 1880,
+      "imageHeight": 1880
+    },
+    {
+      "sourceId": "B07PYRZPSN",
+      "sourceDomain": "amazon.in",
+      "categoryId": "home-kitchen",
+      "displayName": "Solimo Stainless Steel Dutch Oven, 24 cm",
+      "keyAttribute": "304 stainless steel",
+      "originalTitle": "Amazon Brand - Solimo Premium Stainless Steel 24cm Dutch Oven with lid",
+      "brand": "Amazon Brand - Solimo",
+      "productType": "KITCHEN",
+      "attributes": {
+        "Color": "Silver",
+        "Material": "Stainless Steel",
+        "Weight": "1.72 kilograms",
+        "Dimensions": "36.5 centimeters × 25.5 centimeters × 18 centimeters"
+      },
+      "features": [
+        "Made from 304 stainless steel with impact-bonded aluminium base for quick and even heat distribution",
+        "Tempered & thermal shock resistant glass lid with steam vent to view food and provides a seal",
+        "Cool-touch handle for a firm grip",
+        "Tested to withstand high temperature of upto 180degree Celsius"
+      ],
+      "imageId": "71EwHmQe2cL",
+      "imagePath": "5a/5ab1ff02.jpg",
+      "imageWidth": 2242,
+      "imageHeight": 2242
+    },
+    {
+      "sourceId": "B081HD9TRN",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Portable IPX5 Waterproof Bluetooth Speaker",
+      "keyAttribute": "5 W, IPX5",
+      "originalTitle": "AmazonBasics Portable Outdoor IPX5 Waterproof Bluetooth Speaker - Blue, 5W",
+      "brand": "AmazonBasics",
+      "productType": "SPEAKERS",
+      "attributes": {
+        "Color": "Blue",
+        "Weight": "0.66 pounds",
+        "Dimensions": "6.4 inches × 1.5 inches × 3 inches"
+      },
+      "features": [],
+      "imageId": "814eQm6AKML",
+      "imagePath": "39/395ab55e.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07Q1D4GQL",
+      "sourceDomain": "amazon.com.au",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Bluetooth Neckband Headphones",
+      "keyAttribute": "8+ hour playback",
+      "originalTitle": "AmazonBasics Bluetooth Neckband Headphone with 8+ Hour Music Play and Water Resistant Design – Black",
+      "brand": "AmazonBasics",
+      "productType": "HEADPHONES",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "0.3 pounds",
+        "Dimensions": "7.5 inches × 2.8 inches × 7.7 inches"
+      },
+      "features": [
+        "Bluetooth neckband with built-in ear buds and microphone",
+        "Answer calls, listen to music, podcasts, and more, hands-free",
+        "Lightweight design that sits comfortably around your neck",
+        "Great for the gym, commuting, relaxing, work, or outdoor activities"
+      ],
+      "imageId": "61smqwxPpEL",
+      "imagePath": "d6/d68b68d5.jpg",
+      "imageWidth": 2000,
+      "imageHeight": 1926
+    },
+    {
+      "sourceId": "B07ZVZTF2J",
+      "sourceDomain": "amazon.com",
+      "categoryId": "books-hobbies",
+      "displayName": "AmazonBasics SOS Guitar Loop Pedal",
+      "keyAttribute": "Record and loop playback",
+      "originalTitle": "AmazonBasics SOS Guitar Loop Pedal",
+      "brand": "AmazonBasics",
+      "productType": "INSTRUMENT_PARTS_AND_ACCESSORIES",
+      "attributes": {
+        "Dimensions": "3.7 inches × 2.1 inches × 2.1 inches"
+      },
+      "features": [
+        "Guitar loop effect pedal for recording a piece of music and then playing it back on repeat",
+        "Simple control knob; multiple functions: record, overdub, undo the loop, redo the loop, erase, and store the current loop",
+        "Made of high-quality aluminum alloy for durable strength; sleek black finish; anti-skid rubber pads on the backside for stability and to prevent friction",
+        "LED status indicator; user manual included; no batteries needed; powered by an AC adapter (not included)"
+      ],
+      "imageId": "71bBFfm57VL",
+      "imagePath": "2e/2e9bd896.jpg",
+      "imageWidth": 2017,
+      "imageHeight": 2017
+    },
+    {
+      "sourceId": "B081582L4D",
+      "sourceDomain": "amazon.de",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics 20 L Solo Microwave",
+      "keyAttribute": "700 W, 20 litres",
+      "originalTitle": "AmazonBasics 20 L 700 W Solo Microwave Tabletop White",
+      "brand": null,
+      "productType": "KITCHEN",
+      "attributes": {
+        "Color": "White",
+        "Weight": "10.7 kilograms",
+        "Dimensions": "43.9 centimeters × 35.8 centimeters × 25.8 centimeters"
+      },
+      "features": [
+        "20 litre capacity, 255 mm diameter turntable.",
+        "5 power levels, adjustable timer (max. 35 minutes).",
+        "Defrosting function; operating instructions (English language",
+        "Power: 700 W. Use: warm up and defrost"
+      ],
+      "imageId": "71vsiC9OsvL",
+      "imagePath": "db/db08f32f.jpg",
+      "imageWidth": 2271,
+      "imageHeight": 2271
+    },
+    {
+      "sourceId": "B074DD3NS5",
+      "sourceDomain": "amazon.in",
+      "categoryId": "vehicles",
+      "displayName": "AmazonBasics Portable Digital Tyre Inflator",
+      "keyAttribute": "12 V, 120 PSI",
+      "originalTitle": "AmazonBasics Portable Digital Tyre Inflator, Dual Battery Clamps with Carrying Case",
+      "brand": "AmazonBasics",
+      "productType": "AUTO_ACCESSORY",
+      "attributes": {
+        "Weight": "7.26 pounds",
+        "Dimensions": "11.8 inches × 8.8 inches × 8.5 inches"
+      },
+      "features": [
+        "12-volt portable air compressor for adding air to tires (with a 120 PSI rating); 60 L/M free flow at 0 PSI",
+        "Inflate tires for anything from scooters and motorcycles to cars, trucks, and SUVs.",
+        "Can be used to add air to basketballs, air mattresses, and more; includes ball-inflation needle, 2 rubber blow tips, and carrying case",
+        "Powered by direct connection to a car battery; dual alligator battery clamps included"
+      ],
+      "imageId": "81QKKNeDPeL",
+      "imagePath": "31/31f654a0.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1822
+    },
+    {
+      "sourceId": "B07Y5BDJV1",
+      "sourceDomain": "amazon.com",
+      "categoryId": "home-kitchen",
+      "displayName": "AmazonBasics Hard Anodized 12-Piece Non-Stick Cookware Set",
+      "keyAttribute": "12 pieces",
+      "originalTitle": "AmazonBasics Hard Anodized Non-Stick 12-Piece Cookware Set, Black - Pots, Pans and Utensils",
+      "brand": "AmazonBasics",
+      "productType": "KITCHEN",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "12.6 pounds",
+        "Dimensions": "22.4 inches × 14.8 inches × 10.6 inches"
+      },
+      "features": [
+        "12-piece non-stick cookware set constructed with durable aluminum and a hard anodized exterior coating; ANSI certified and PFOA-free",
+        "Multi-layer, non-stick interior coating for easy food release and cleaning",
+        "Tempered glass lids allow for easy food monitoring and heat containment",
+        "Dual-riveted silicone handle stays cool to the touch and provides a comfortable, non-slip grip"
+      ],
+      "imageId": "71pXe8-52FL",
+      "imagePath": "a0/a0cec28c.jpg",
+      "imageWidth": 2213,
+      "imageHeight": 2213
+    },
+    {
+      "sourceId": "B07P8YG5D3",
+      "sourceDomain": "amazon.com",
+      "categoryId": "photography",
+      "displayName": "AmazonBasics Smartphone Mini Tripod",
+      "keyAttribute": "For phones and compact cameras",
+      "originalTitle": "AmazonBasics Smartphone Mini Tripod",
+      "brand": "AmazonBasics",
+      "productType": "CAMERA_TRIPOD",
+      "attributes": {
+        "Weight": "0.39 pounds",
+        "Dimensions": "7.9 inches × 2.9 inches × 1.6 inches"
+      },
+      "features": [
+        "Mini tripod for smartphones and point-and-shoot cameras including Compact System Cameras, mirror-less cameras, and small DSLRs",
+        "Width-adjustable mount compatible with smartphones; expands 2.2 - 3.3 inches",
+        "Place on a surface or table top to capture crystal clear, professional-looking images and video",
+        "Perfect for on-the-go shooting while traveling or close to home; compact size folds down to fit in your carry-on or handbag"
+      ],
+      "imageId": "718yP-KR7WL",
+      "imagePath": "de/def06ba5.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B083T4NV3D",
+      "sourceDomain": "amazon.in",
+      "categoryId": "vehicles",
+      "displayName": "AmazonBasics 3-Bike Hitch Rack",
+      "keyAttribute": "For 2-inch hitch receivers",
+      "originalTitle": "AmazonBasics Hitch Racks for 2 in. Hitch-3-Bike, Black, NA Market",
+      "brand": "AmazonBasics",
+      "productType": "TRANSPORT_RACK",
+      "attributes": {
+        "Weight": "20.72 pounds",
+        "Dimensions": "35.4 inches × 12.6 inches × 39.4 inches"
+      },
+      "features": [],
+      "imageId": "61O-LmzUarL",
+      "imagePath": "32/32e34f40.jpg",
+      "imageWidth": 1500,
+      "imageHeight": 1500
+    },
+    {
+      "sourceId": "B01N3LOJWX",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Over-Ear Headphones",
+      "keyAttribute": "Wired, 0.21 kg",
+      "originalTitle": "AmazonBasics Over-Ear Headphones",
+      "brand": "AmazonBasics",
+      "productType": "HEADPHONES",
+      "attributes": {
+        "Weight": "0.21 kilograms",
+        "Dimensions": "18 centimeters × 7.4 centimeters × 19.3 centimeters"
+      },
+      "features": [],
+      "imageId": "81fMzOqdnzL",
+      "imagePath": "68/6831e6c6.jpg",
+      "imageWidth": 2162,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B0888M8SYT",
+      "sourceDomain": "amazon.com",
+      "categoryId": "gaming",
+      "displayName": "AmazonBasics Racing-Style Gaming Office Chair",
+      "keyAttribute": "White",
+      "originalTitle": "AmazonBasics Racing/Gaming Style Office Chair - White",
+      "brand": "AmazonBasics",
+      "productType": "CHAIR",
+      "attributes": {
+        "Color": "White",
+        "Weight": "28.1 pounds",
+        "Dimensions": "25.2 inches × 22.6 inches × 44.1 inches"
+      },
+      "features": [
+        "Gaming or office chair with a sleek, modern look",
+        "Padded high backrest, seat, and arm rests comfortably support your body through long work sessions",
+        "Swiveling 5-point molded resin base with muted 360 degree caster wheels",
+        "Upgraded gas lift mechanism with side lever for adjusting chair height"
+      ],
+      "imageId": "81cnznhP4YL",
+      "imagePath": "79/798608e4.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07GX36SWK",
+      "sourceDomain": "amazon.in",
+      "categoryId": "vehicles",
+      "displayName": "AmazonBasics High Security Mini D-Lock",
+      "keyAttribute": "18 mm shackle, 4' cable",
+      "originalTitle": "AmazonBasics High Security Mini D-Lock Bike Lock, with 4' Flex Cable, 18 mm Shackle",
+      "brand": "AmazonBasics",
+      "productType": "LOCK",
+      "attributes": {
+        "Weight": "1.63 kilograms",
+        "Dimensions": "21.4 centimeters × 15.3 centimeters × 3.8 centimeters"
+      },
+      "features": [
+        "1 year limited warranty"
+      ],
+      "imageId": "81JWL3p6hWL",
+      "imagePath": "2e/2e08d042.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07NLLP779",
+      "sourceDomain": "amazon.com",
+      "categoryId": "vehicles",
+      "displayName": "AmazonBasics Premium Waterproof Car Cover",
+      "keyAttribute": "Waterproof",
+      "originalTitle": "AmazonBasics Premium Waterproof Car Cover",
+      "brand": "AmazonBasics",
+      "productType": "AUTO_ACCESSORY",
+      "attributes": {},
+      "features": [],
+      "imageId": "61GDpWbTvNL",
+      "imagePath": "be/be207e1a.jpg",
+      "imageWidth": 2500,
+      "imageHeight": 1666
+    },
+    {
+      "sourceId": "B07JB57Q63",
+      "sourceDomain": "amazon.com",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics 2.1 Computer Speakers with Subwoofer",
+      "keyAttribute": "8 W",
+      "originalTitle": "AmazonBasics AC-2.1A 2.1 8W Computer Speakers with Subwoofer",
+      "brand": "AmazonBasics",
+      "productType": "SPEAKERS",
+      "attributes": {
+        "Model": "AmazonBasics 2.1 8W Speakers with Subwoofer",
+        "Weight": "3.9 pounds",
+        "Dimensions": "11.6 inches × 5.7 inches × 7.3 inches"
+      },
+      "features": [
+        "Room filling sound: Despite its compact size This subwoofer speaker system delivers amazing sound. Featuring 8 watts RMS and 16 watts peak power, you’ll experience great sound to fill almost any room in the house.",
+        "Easy to use control pod: The control pod provides full control of the speaker system. Power on & off, adjust master volume, bass volume, connect portable gear to the 3. 5mm aux input jack, or plug headphones into the headphone jack for private listening.",
+        "Subwoofer performance: The ported 3 in. Down-firing subwoofer delivers surprising bass performance. When combined with 2” satellite drivers, you can expect a great listening experience from most any Device.",
+        "Contemporary design: enhanced cabinet Form provides optimum sound response from this Compact 2. 1 Sound system."
+      ],
+      "imageId": "81eLMrjQ-jL",
+      "imagePath": "b7/b7cd2280.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1537
+    },
+    {
+      "sourceId": "B078N4Y2BW",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "gaming",
+      "displayName": "AmazonBasics PS4 Gaming Chat Headset",
+      "keyAttribute": "Mono, with microphone",
+      "originalTitle": "AmazonBasics Gaming Chat Headset for PlayStation 4 with Microphone - 1,21 m Cable, Gold",
+      "brand": "AmazonBasics",
+      "productType": "HEADPHONES",
+      "attributes": {
+        "Color": "Gold",
+        "Weight": "87.8 grams",
+        "Dimensions": "5.3 inches × 7 inches × 2.5 inches"
+      },
+      "features": [
+        "Mono chat headset officially licensed for PlayStation 4; offers a lightweight, comfortable design in a fun Gold colour",
+        "Single padded ear cup makes it possible to hear gaming action directly from the TV or through the headset",
+        "Adjustable boom mic for clear audio; in-line volume and mute puts loads of control right at your fingertips",
+        "3.5 mm plug connects directly to a PS4 DualShock controller or other device with a 3.5 mm jack"
+      ],
+      "imageId": "61CnTnpJK4L",
+      "imagePath": "7a/7a1685de.jpg",
+      "imageWidth": 1500,
+      "imageHeight": 1317
+    },
+    {
+      "sourceId": "B074DMCRND",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "vehicles",
+      "displayName": "AmazonBasics 2-Gauge Car Jumper Cables",
+      "keyAttribute": "6.09 m",
+      "originalTitle": "Amazonbasics Jumper Cable for Car Battery, 2 Gauge, 6.09 Meters",
+      "brand": "AmazonBasics",
+      "productType": "AUTO_PART",
+      "attributes": {
+        "Weight": "7.15 pounds",
+        "Dimensions": "13.8 inches × 3.5 inches × 13.8 inches"
+      },
+      "features": [
+        "2-gauge jumper cables for jump starting a dead or weak battery; UL certified; ideal for pick-ups, vans, large-size SUVs, full-size cars, mid-size cars, and small/compact cars",
+        "Heavy-duty, tight-grip alligator clamps with a 320 amp rating; strong spring and comfortable handle for easy positioning",
+        "Red/black insulated exterior ensures quick visual identification for easy set-up",
+        "Flexible cables; 6.09 Meters length allows for charging a battery from behind the vehicle (front to back); carrying case included"
+      ],
+      "imageId": "91T1VjxOzFL",
+      "imagePath": "4a/4a8dfc98.jpg",
+      "imageWidth": 2554,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07MRHF9GP",
+      "sourceDomain": "amazon.in",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Wireless Party Speaker",
+      "keyAttribute": "40 W, FM radio, lights",
+      "originalTitle": "AmazonBasics Party Speaker - Wireless PA Speaker with Lights, Radio, Bass Boost, Mic Input and USB Charging",
+      "brand": "AmazonBasics",
+      "productType": "SPEAKERS",
+      "attributes": {
+        "Dimensions": "10.6 inches × 12.8 inches × 13 inches"
+      },
+      "features": [
+        "Wireless 40W portable speaker system with bass boost switch and FM radio",
+        "USB port for playback and device charging; 3.5mm input for wired connectivity",
+        "Bluetooth compatible",
+        "Includes built-in rechargeable Lead-Acid battery; provides up to 12 hours of continuous playback when fully charged"
+      ],
+      "imageId": "814HYS5kayL",
+      "imagePath": "5b/5b45ec51.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07W4CLC92",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "audio",
+      "displayName": "AmazonBasics Active Bookshelf Speakers",
+      "keyAttribute": "40 W pair",
+      "originalTitle": "AmazonBasics Bookshelf Speakers with Active Speaker - 40W, 20-20KHz",
+      "brand": "AmazonBasics",
+      "productType": "SPEAKERS",
+      "attributes": {
+        "Material": "SILVER",
+        "Weight": "13.46 pounds",
+        "Dimensions": "6.5 inches × 8.5 inches × 10.8 inches"
+      },
+      "features": [
+        "AmazonBasics Bookshelf Speakers with Active Speaker - 40W, 20-20KHz",
+        "An Amazon Brand",
+        "Content coming soon"
+      ],
+      "imageId": "91GBoEQLyQL",
+      "imagePath": "8f/8f7c6c92.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07N428SG9",
+      "sourceDomain": "amazon.de",
+      "categoryId": "audio",
+      "displayName": "Umi. Essentials W5s True Wireless Earbuds",
+      "keyAttribute": "Bluetooth 5.0, IPX7",
+      "originalTitle": "Umi. Essentials TWS Bluetooth 5.0 IPX7 W5s Wireless In-Ear Headphones for iPhone Samsung, Huawei with Patented Smart Metal Charging Case .",
+      "brand": null,
+      "productType": "HEADPHONES",
+      "attributes": {
+        "Color": "grey",
+        "Weight": "104 grams",
+        "Dimensions": "1.8 inches × 0.7 inches × 0.8 inches"
+      },
+      "features": [
+        "[W5s with intelligent charging case] These in-ear headphones are automatically wound up",
+        "[Bluetooth 5.0 and Deep Stereo Bass] The Bluetooth transmission speed is up to 48MBps at 15 meters distance, thanks to the powerful interference protection technology. This means smooth, clear conversations and no interruptions when listening to music on the go. The unique stereo design provides the highest quality sound so you can really feel the music",
+        "[Ergonomic Mini Design and IPX7 Protection] With textured surface, invisible in-ear design, soft cushions and genuine wireless technology, this headband is cool, comfortable and high quality. Freedom for your hands and your music: IPX7 protection is rain and sweat resistant. The metallic pocket-sized charging station is stylish and can also be carried in your hand so you can charge on the go.",
+        "[High quality metal charging case with patented independent power management technology] The exclusive patented independent power management technology allows the left and right ear plugs to be charged independently and thus maximise the time. Either insert one or both earplugs into the station: a red LED light indicates \"discharge\", a blue LED light indicates \"fully charged\". The earplugs are automatically charged"
+      ],
+      "imageId": "81XAW3y4tlL",
+      "imagePath": "e6/e64f1ee2.jpg",
+      "imageWidth": 2274,
+      "imageHeight": 2275
+    },
+    {
+      "sourceId": "B06VVXMJ1S",
+      "sourceDomain": "amazon.co.uk",
+      "categoryId": "gaming",
+      "displayName": "AmazonBasics XXL Gaming Mouse Pad",
+      "keyAttribute": "XXL",
+      "originalTitle": "AmazonBasics XXL Gaming Mouse Pad",
+      "brand": "AmazonBasics",
+      "productType": "MOUSE_PAD",
+      "attributes": {
+        "Weight": "8.8 ounces",
+        "Dimensions": "17.8 inches × 0.1 inches × 15.8 inches"
+      },
+      "features": [
+        "XXL gaming mouse pad—ideal for gamers, graphic designers, or anyone who uses a mouse",
+        "High-quality cloth surface promotes smooth mouse gliding and enhanced precision",
+        "Steady, thick, rubberized base keeps mouse pad in place",
+        "Machine washable for easy cleaning; large size for optimal gaming"
+      ],
+      "imageId": "91XIUIBmZ9L",
+      "imagePath": "35/35e64c05.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 1993
+    },
+    {
+      "sourceId": "B084CG46BF",
+      "sourceDomain": "amazon.in",
+      "categoryId": "photography",
+      "displayName": "AmazonBasics Large Outdoor Camera Backpack",
+      "keyAttribute": "22 × 14 × 10 in",
+      "originalTitle": "AmazonBasics Large Outdoor Camera Bagpack - 22 x 14 x 10 Inches, Navy",
+      "brand": "AmazonBasics",
+      "productType": "CAMERA_BAGS_AND_CASES",
+      "attributes": {
+        "Weight": "2.4 pounds",
+        "Dimensions": "20 inches × 7.5 inches × 13 inches"
+      },
+      "features": [],
+      "imageId": "91MX4PkbMSL",
+      "imagePath": "55/55396df8.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B07D8X6CK8",
+      "sourceDomain": "amazon.ca",
+      "categoryId": "gaming",
+      "displayName": "AmazonBasics Programmable Mechanical Gaming Keyboard",
+      "keyAttribute": "RGB backlit, UK layout",
+      "originalTitle": "AmazonBasics Programmable Mechanical Gaming Keyboard | RGB LED Backlit, UK Layout (QWERTY)",
+      "brand": "AmazonBasics",
+      "productType": "KEYBOARDS",
+      "attributes": {
+        "Color": "Black",
+        "Dimensions": "560 millimeters × 258 millimeters × 48 millimeters"
+      },
+      "features": [],
+      "imageId": "81Hlbi96ZVL",
+      "imagePath": "dd/dd5960fa.jpg",
+      "imageWidth": 2560,
+      "imageHeight": 2560
+    },
+    {
+      "sourceId": "B00DHPCSA0",
+      "sourceDomain": "primenow.amazon.com",
+      "categoryId": "photography",
+      "displayName": "AmazonBasics 52-Inch Carbon Fiber Travel Tripod",
+      "keyAttribute": "Carbon fiber, 2.44 lb",
+      "originalTitle": "AmazonBasics 52-Inch Carbon Fiber Travel Tripod with Bag",
+      "brand": "AmazonBasics",
+      "productType": "CAMERA_TRIPOD",
+      "attributes": {
+        "Color": "Black",
+        "Weight": "2.44 pounds",
+        "Dimensions": "12.2 inches × 3.7 inches × 3.9 inches"
+      },
+      "features": [
+        "Carbon fiber tripod with adjustable-height legs, rotating leg locks, and rubber feet",
+        "Built in level, quick release mounting plate; Ball-head design for 360 degree rotation and 90-degree tilt",
+        "Recommended max load weight is 8 lbs (3.6kg) for optimal performance",
+        "Weighs 2.4 lbs; extends from 12.5” when folded to 52” when fully extended; Carrying case included"
+      ],
+      "imageId": "71-4IZctoYL",
+      "imagePath": "95/95462f93.jpg",
+      "imageWidth": 1427,
+      "imageHeight": 2560
+    }
+  ]
+}

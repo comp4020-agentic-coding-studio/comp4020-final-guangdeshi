@@ -150,6 +150,7 @@ function makePost(overrides: Partial<Post> = {}): Post {
     status: "active",
     mode: "BUY_PASS",
     isDemo: false,
+    catalogProductId: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
