@@ -317,6 +317,28 @@ is an idempotent upsert that never deletes a product (a real post may link to
 it) and never touches user tables. Every product photo keeps its source image
 id and URL and is credited on its product page and at `/credits`.
 
+## 29. Every shared state change is live, and the server renders it
+
+The brief's real-time bar applies to every user-visible shared change, not
+only votes: new and edited questions, opinion changes and deletions,
+outcomes and influential markers. A new mutation must broadcast on the right
+channel (`src/sse.ts`), **after** its write returns, and never for a rejected
+request. The client must reach the new state by refetching its own
+server-rendered `[data-live-region]`s, not by hand-building viewer-specific
+HTML from the payload. Feed events carry ids only, and only for posts that
+are or were public, active and non-demo. Add the event to
+`spec/realtime-contract.test.ts` and the visible behaviour to
+`scripts/verify-realtime.mjs`. See `docs/adr/0005-realtime-event-contract.md`.
+
+## 30. Tests never touch the preview or production database
+
+The spec and every account-creating browser script refuse any target whose
+`/healthz/test-target` doesn't report `disposable`. That requires
+`BOP_DISPOSABLE_DB=1`, and is never true on Fly or for a `*preview*`
+database. Run them against `pnpm dev:test` or another throwaway instance.
+Never weaken this check to get a run through: a test run once filled the
+preview database with test accounts.
+
 ---
 
 ## Current project state

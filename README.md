@@ -63,8 +63,8 @@ to the buyer. The opinions belong to the community.**
   for why that was a deliberate choice, not an omission.
 - **Accountability, low friction, real-time co-presence** carry over
   unchanged from the original design: one current opinion per account per
-  post (a database constraint), one stance plus one sentence, live updates
-  within about a second.
+  post (a database constraint), one stance plus one sentence, every shared
+  change live within about a second ([ADR 0005](docs/adr/0005-realtime-event-contract.md)).
 
 ## Stack
 

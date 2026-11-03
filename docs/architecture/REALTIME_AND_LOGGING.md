@@ -2,6 +2,13 @@
 
 ## Real-time: SSE, not WebSockets
 
+> **Current contract:** [ADR 0005](../adr/0005-realtime-event-contract.md).
+> There are three channels: post, feed (`/discover/events`) and admin. Events
+> say what changed, and each open page refetches its own server-rendered
+> regions, so edits, deletions, outcomes, influential markers and new
+> questions all reach other open sessions live. The notes below describe the
+> original per-post design that this builds on.
+
 Every live event in this product is server→client only: a new opinion, an
 updated Buy/Pass count, a recorded purchase outcome. The client never needs
 to push a stream of its own data back over the same connection (opinion
