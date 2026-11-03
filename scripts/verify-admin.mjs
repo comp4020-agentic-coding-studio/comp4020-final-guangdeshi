@@ -6,8 +6,18 @@
 import { chromium } from "playwright";
 import { DatabaseSync } from "node:sqlite";
 
-const BASE = process.env.APP_URL ?? "http://localhost:8080";
-const DB_PATH = process.env.DATABASE_PATH ?? "./data/buyorpass.test.sqlite";
+import { requireDisposableTarget } from "./test-target-guard.mjs";
+
+const BASE = process.env.APP_URL;
+await requireDisposableTarget(BASE);
+// This script promotes its test user to admin by writing to the server's
+// database file directly, so it must be told exactly which file that is —
+// never a default that could be some other environment's database.
+const DB_PATH = process.env.DATABASE_PATH;
+if (!DB_PATH || /preview/i.test(DB_PATH)) {
+  console.error("Refusing to run: set DATABASE_PATH to the disposable test server's own database file.");
+  process.exit(2);
+}
 
 function log(msg) {
   console.log(`[verify-admin] ${msg}`);

@@ -11,16 +11,15 @@
 //
 // It registers real test accounts, so it must only ever run against an
 // isolated test server and database:
-//   PORT=8081 RATE_LIMIT_SCALE=1000 DATABASE_PATH=/tmp/x/db.sqlite UPLOAD_DIR=/tmp/x/uploads node src/server.ts
+//   PORT=8081 BOP_DISPOSABLE_DB=1 RATE_LIMIT_SCALE=1000 DATABASE_PATH=/tmp/x/db.sqlite UPLOAD_DIR=/tmp/x/uploads node src/server.ts
 //   APP_URL=http://localhost:8081 node scripts/verify-catalog.mjs
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
+import { requireDisposableTarget } from "./test-target-guard.mjs";
+
 const BASE = process.env.APP_URL;
-if (!BASE || /:8080\b/.test(BASE)) {
-  console.error("Refusing to run: set APP_URL to an isolated test server (never the 8080 preview server).");
-  process.exit(2);
-}
+await requireDisposableTarget(BASE);
 const OUT = process.env.SCREENSHOT_DIR ?? "screenshots/catalog";
 mkdirSync(OUT, { recursive: true });
 

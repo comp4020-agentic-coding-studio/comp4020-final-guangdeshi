@@ -2,13 +2,16 @@
 // isolated real browser contexts to confirm the multi-user realtime
 // requirement end-to-end, and captures screenshots at the three required
 // viewports plus key flows. Run with: node scripts/verify-browser.mjs
-// Expects the app already running at APP_URL (default localhost:8080) with
-// RATE_LIMIT_SCALE set high enough not to block this script's own
-// registrations (see package.json's "dev:test" script).
+// Expects a disposable test server at APP_URL (`pnpm dev:test`, or any
+// server started with BOP_DISPOSABLE_DB=1 and a throwaway database); it
+// refuses to run against anything else.
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
-const BASE = process.env.APP_URL ?? "http://localhost:8080";
+import { requireDisposableTarget } from "./test-target-guard.mjs";
+
+const BASE = process.env.APP_URL;
+await requireDisposableTarget(BASE);
 mkdirSync("screenshots", { recursive: true });
 
 function log(msg) {

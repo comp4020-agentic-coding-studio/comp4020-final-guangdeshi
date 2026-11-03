@@ -5,7 +5,7 @@
   "scripts": {
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "dev": "node src/server.ts",
-    "dev:test": "RATE_LIMIT_SCALE=1000 DATABASE_PATH=./data/buyorpass.test.sqlite UPLOAD_DIR=./data/uploads-test node src/server.ts",
+    "dev:test": "BOP_DISPOSABLE_DB=1 RATE_LIMIT_SCALE=1000 DATABASE_PATH=./data/buyorpass.test.sqlite UPLOAD_DIR=./data/uploads-test node src/server.ts",
     "typecheck": "tsc --noEmit",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",

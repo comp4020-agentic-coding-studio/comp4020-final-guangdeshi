@@ -40,7 +40,7 @@ jobs:
         # correctly block (see src/server.ts's RATE_LIMIT_SCALE comment).
         run: |
           docker build -t app .
-          docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e DATABASE_PATH=/data/buyorpass.sqlite -e UPLOAD_DIR=/data/uploads -e RATE_LIMIT_SCALE=1000 --tmpfs /data app
+          docker run -d --init --name app -p 8080:8080 -e PORT=8080 -e DATABASE_PATH=/data/buyorpass.sqlite -e UPLOAD_DIR=/data/uploads -e RATE_LIMIT_SCALE=1000 -e BOP_DISPOSABLE_DB=1 --tmpfs /data app
       - name: Run the spec
         run: pnpm check
         env:
