@@ -4,7 +4,7 @@
 // category feed when no interests are set, and getMatchingSignals only ever
 // reports signals that are true by construction (shared category/tag,
 // declared interest), never a learned score.
-import { db, getUserInterests, listFeed, type Post } from "../db.ts";
+import { db, getPostById, getUserInterests, listFeed, rowToPost, searchPosts, type Post } from "../db.ts";
 import type { FeedResult, MatchingSignal, Pagination, RecommendationService } from "./types.ts";
 
 function listRecentByCategories(categoryIds: string[], limit: number): Post[] {
@@ -12,24 +12,11 @@ function listRecentByCategories(categoryIds: string[], limit: number): Post[] {
   const placeholders = categoryIds.map(() => "?").join(",");
   const rows = db
     .prepare(
-      `SELECT * FROM posts WHERE status = 'active' AND visibility = 'public' AND category_id IN (${placeholders})
+      `SELECT * FROM posts WHERE status = 'active' AND visibility = 'public' AND is_demo = 0 AND category_id IN (${placeholders})
        ORDER BY created_at DESC LIMIT ?`,
     )
     .all(...categoryIds, limit) as any[];
-  return rows.map((row) => ({
-    id: row.id,
-    authorId: row.author_id,
-    title: row.title,
-    description: row.description,
-    priceCents: row.price_cents,
-    currency: row.currency,
-    categoryId: row.category_id,
-    tags: JSON.parse(row.tags),
-    visibility: row.visibility,
-    status: row.status,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  return rows.map(rowToPost);
 }
 
 export class ChronologicalRecommendationService implements RecommendationService {
@@ -54,29 +41,28 @@ export class ChronologicalRecommendationService implements RecommendationService
     return { posts: page.posts, nextCursor: page.nextCursor };
   }
 
+  /**
+   * Feature C: historical decisions related to this one. FTS5 full-text
+   * match over the post's own title/description (via searchPosts, which
+   * also indexes post_context's free text and category-prompt answers —
+   * see src/db.ts), falling back to plain same-category recency if the
+   * FTS5 query matches nothing (e.g. a very short or generic title). This
+   * is transparent keyword/category relevance, not a learned or semantic
+   * ranking — see docs/research/RECOMMENDATION_ROADMAP.md.
+   */
   getRelatedPosts(postId: string, limit = 6): Post[] {
-    const post = db.prepare(`SELECT * FROM posts WHERE id = ?`).get(postId) as any;
+    const post = getPostById(postId);
     if (!post) return [];
+    const ftsResults = searchPosts(post.title, { excludePostId: postId, limit });
+    if (ftsResults.length > 0) return ftsResults.map((r) => r.post);
+
     const rows = db
       .prepare(
-        `SELECT * FROM posts WHERE status = 'active' AND visibility = 'public' AND category_id = ? AND id != ?
+        `SELECT * FROM posts WHERE status = 'active' AND visibility = 'public' AND is_demo = 0 AND category_id = ? AND id != ?
          ORDER BY created_at DESC LIMIT ?`,
       )
-      .all(post.category_id, postId, limit) as any[];
-    return rows.map((row) => ({
-      id: row.id,
-      authorId: row.author_id,
-      title: row.title,
-      description: row.description,
-      priceCents: row.price_cents,
-      currency: row.currency,
-      categoryId: row.category_id,
-      tags: JSON.parse(row.tags),
-      visibility: row.visibility,
-      status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+      .all(post.categoryId, postId, limit) as any[];
+    return rows.map(rowToPost);
   }
 
   getMatchingSignals(userId: string, postId: string): MatchingSignal[] {

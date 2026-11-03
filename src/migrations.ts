@@ -155,6 +155,205 @@ const MIGRATIONS: Migration[] = [
         ('other', 'Other', 'Anything that does not fit elsewhere', 100);
     `,
   },
+  {
+    // v2.0 "Which One?" mode: a post gains an explicit mode, defaulting every
+    // existing row to BUY_PASS (brief's "old posts are treated as BUY_PASS
+    // unless explicitly migrated" — satisfied by this default, not a backfill
+    // script, so zero existing rows are touched). purchase_options holds the
+    // 2-4 candidate products a WHICH_ONE post compares; it's empty for every
+    // existing BUY_PASS post.
+    name: "0003_post_modes_and_options",
+    sql: `
+      ALTER TABLE posts ADD COLUMN post_mode TEXT NOT NULL DEFAULT 'BUY_PASS' CHECK (post_mode IN ('BUY_PASS','WHICH_ONE'));
+
+      CREATE TABLE purchase_options (
+        id TEXT PRIMARY KEY,
+        post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL CHECK (position BETWEEN 0 AND 3),
+        name TEXT NOT NULL,
+        image_id TEXT NULL REFERENCES images(id),
+        expected_price_cents INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        original_price_cents INTEGER NULL,
+        condition TEXT NULL,
+        source_url TEXT NULL,
+        sale_note TEXT NULL,
+        specifications TEXT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (post_id, position)
+      );
+      CREATE INDEX idx_purchase_options_post ON purchase_options(post_id, position);
+    `,
+  },
+  {
+    // Opinions on a WHICH_ONE post select a purchase_option (or explicitly
+    // "none of these") instead of a BUY/PASS stance. node:sqlite's ALTER
+    // TABLE can't relax an existing CHECK constraint, so this is a full
+    // table rebuild (verified safe inside a transaction with foreign_keys=ON
+    // during planning): copy every existing row forward with stance intact
+    // and the two new columns at their "unused" default, so no existing
+    // Buy/Pass opinion changes meaning. The CHECK enforces that an opinion
+    // is exactly one of the three shapes, never a mix and never all-null.
+    name: "0004_opinions_comparison_support",
+    sql: `
+      CREATE TABLE opinions_new (
+        id TEXT PRIMARY KEY,
+        post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        stance TEXT NULL CHECK (stance IN ('BUY','PASS')),
+        selected_option_id TEXT NULL REFERENCES purchase_options(id) ON DELETE CASCADE,
+        selected_none INTEGER NOT NULL DEFAULT 0 CHECK (selected_none IN (0,1)),
+        comment TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (post_id, user_id),
+        CHECK (
+          (stance IS NOT NULL AND selected_option_id IS NULL AND selected_none = 0)
+          OR (stance IS NULL AND selected_option_id IS NOT NULL AND selected_none = 0)
+          OR (stance IS NULL AND selected_option_id IS NULL AND selected_none = 1)
+        )
+      );
+      INSERT INTO opinions_new (id, post_id, user_id, stance, selected_option_id, selected_none, comment, created_at, updated_at)
+        SELECT id, post_id, user_id, stance, NULL, 0, comment, created_at, updated_at FROM opinions;
+      DROP TABLE opinions;
+      ALTER TABLE opinions_new RENAME TO opinions;
+      CREATE INDEX idx_opinions_post ON opinions(post_id);
+      CREATE INDEX idx_opinions_user ON opinions(user_id, created_at DESC);
+      CREATE INDEX idx_opinions_option ON opinions(selected_option_id);
+    `,
+  },
+  {
+    // Optional, versioned context answers for a post (Feature A). Absent
+    // entirely for a post that answered nothing — never a row of empty
+    // strings, so "don't render blank cards" is true by construction at the
+    // data layer, not just in the template.
+    name: "0005_post_context",
+    sql: `
+      CREATE TABLE post_context (
+        post_id TEXT PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
+        schema_version INTEGER NOT NULL,
+        category_key TEXT NOT NULL,
+        answers TEXT NOT NULL DEFAULT '{}',
+        free_text TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL
+      );
+    `,
+  },
+  {
+    // Feature E: the buyer's purchased option (WHICH_ONE posts only) and an
+    // optional pointer at the single opinion they found influential. Both
+    // nullable additions to the existing table — every pre-v2 outcome row
+    // keeps its status/reflection/decided_at exactly as before.
+    //
+    // influential_opinion_id uses ON DELETE SET NULL deliberately (unlike
+    // every other FK in this schema, which CASCADEs): the brief explicitly
+    // requires "a deleted opinion must not leave a broken public reference"
+    // — the default NO ACTION would instead make deleting an opinion that's
+    // currently marked influential fail outright with a foreign-key
+    // violation, which is worse than either outcome. SET NULL means the
+    // outcome row survives and simply stops pointing at anything, which the
+    // UI already renders correctly (no influential badge shown at all).
+    name: "0006_outcome_extensions",
+    sql: `
+      ALTER TABLE post_outcomes ADD COLUMN purchased_option_id TEXT NULL REFERENCES purchase_options(id);
+      ALTER TABLE post_outcomes ADD COLUMN influential_opinion_id TEXT NULL REFERENCES opinions(id) ON DELETE SET NULL;
+    `,
+  },
+  {
+    // Feature D (demo content) + Feature C (historical search). is_demo on
+    // both posts AND users (a post inherits demo status from its author at
+    // creation, but marking the user too means a query filtering "real
+    // participation" never has to join back through posts for user-level
+    // actions like registration or login) defaults to 0, so every existing
+    // row is unambiguously real. The FTS5 table is populated explicitly from
+    // db.ts on create/update/delete (never via SQL triggers) so every write
+    // that touches the index is a visible, debuggable line of application
+    // code.
+    name: "0007_demo_and_search",
+    sql: `
+      ALTER TABLE posts ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0 CHECK (is_demo IN (0,1));
+      CREATE INDEX idx_posts_is_demo ON posts(is_demo);
+      ALTER TABLE users ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0 CHECK (is_demo IN (0,1));
+
+      CREATE TABLE demo_metadata (
+        post_id TEXT PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
+        generation_method TEXT NOT NULL,
+        model_identity TEXT NULL,
+        generated_at TEXT NOT NULL,
+        seed_version TEXT NOT NULL,
+        validation_method TEXT NOT NULL
+      );
+
+      CREATE VIRTUAL TABLE posts_search USING fts5(post_id UNINDEXED, title, description, context_text);
+    `,
+  },
+  {
+    // Real product catalog, separate from user-created purchasing posts. A
+    // catalog product is factual product data (name, brand, photo, known
+    // attributes) imported from a licensed dataset — never a price, rating,
+    // review or availability claim. Catalog images get their own table rather
+    // than reusing `images`, whose owner_user_id is a required FK to a real
+    // registered user; a catalog product has no owning user. Posts and
+    // purchase options gain a nullable link so a real question can be about a
+    // catalog product without every question being forced through one.
+    name: "0008_product_catalog",
+    sql: `
+      CREATE TABLE catalog_import_sources (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        license TEXT NOT NULL,
+        license_url TEXT NOT NULL,
+        attribution TEXT NOT NULL,
+        retrieved_at TEXT NOT NULL,
+        imported_at TEXT NOT NULL
+      );
+
+      CREATE TABLE catalog_products (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL REFERENCES catalog_import_sources(id),
+        source_item_id TEXT NOT NULL,
+        source_domain TEXT NOT NULL,
+        category_id TEXT NOT NULL REFERENCES categories(id),
+        name TEXT NOT NULL,
+        original_title TEXT NOT NULL,
+        brand TEXT NULL,
+        product_type TEXT NULL,
+        key_attribute TEXT NULL,
+        features TEXT NOT NULL DEFAULT '[]',
+        imported_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (source_id, source_item_id)
+      );
+      CREATE INDEX idx_catalog_products_category ON catalog_products(category_id, name);
+
+      CREATE TABLE catalog_product_images (
+        id TEXT PRIMARY KEY,
+        product_id TEXT NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL,
+        source_image_id TEXT NOT NULL,
+        source_image_url TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        width INTEGER NOT NULL,
+        height INTEGER NOT NULL,
+        original_width INTEGER NOT NULL,
+        original_height INTEGER NOT NULL,
+        UNIQUE (product_id, position)
+      );
+
+      CREATE TABLE catalog_product_attributes (
+        product_id TEXT NOT NULL REFERENCES catalog_products(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        value TEXT NOT NULL,
+        PRIMARY KEY (product_id, name)
+      );
+
+      ALTER TABLE posts ADD COLUMN catalog_product_id TEXT NULL REFERENCES catalog_products(id);
+      CREATE INDEX idx_posts_catalog_product ON posts(catalog_product_id);
+      ALTER TABLE purchase_options ADD COLUMN catalog_product_id TEXT NULL REFERENCES catalog_products(id);
+      CREATE INDEX idx_purchase_options_catalog_product ON purchase_options(catalog_product_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

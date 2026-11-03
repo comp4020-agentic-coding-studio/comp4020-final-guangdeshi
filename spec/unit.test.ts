@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import { hashPassword, verifyPassword, isValidEmail, isValidHandle, isValidPassword } from "../src/auth.ts";
 import { validateOpinionInput, validatePostInput, normalizeTags, escapeHtml } from "../src/validation.ts";
+import { postCard, referenceCard } from "../src/render.ts";
+import type { Post } from "../src/db.ts";
 
 describe("password hashing", () => {
   it("hashes never equal the plaintext and verify correctly", () => {
@@ -131,5 +133,126 @@ describe("XSS escaping", () => {
     const escaped = escapeHtml(`<script>alert('xss')</script>`);
     expect(escaped).not.toContain("<script>");
     expect(escaped).toContain("&lt;script&gt;");
+  });
+});
+
+function makePost(overrides: Partial<Post> = {}): Post {
+  return {
+    id: "00000000-0000-0000-0000-000000000000",
+    authorId: "author-1",
+    title: "A test post",
+    description: "d",
+    priceCents: null,
+    currency: null,
+    categoryId: "computing",
+    tags: [],
+    visibility: "public",
+    status: "active",
+    mode: "BUY_PASS",
+    isDemo: false,
+    catalogProductId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+// 9. Demo labels remain visible — a pure render-function unit test (no
+// database, no server) for postCard's own demo-tag rendering, the single
+// piece every Discover source view (and the landing page's demo preview)
+// relies on to keep a fictional scenario visually unmistakable.
+describe("postCard: demo label and mode tag rendering", () => {
+  const cardOpts = {
+    coverImageId: null,
+    authorHandle: "demo-taylor",
+    authorDisplayName: "Taylor (Demo)",
+    categoryName: "Computing & Tech",
+    buyCount: 0,
+    passCount: 0,
+  };
+
+  it("renders the demo tag on an isDemo post and never on a real one", () => {
+    const demoHtml = postCard(makePost({ isDemo: true }), cardOpts);
+    expect(demoHtml).toContain("🤖 Demo");
+    expect(demoHtml).toContain("post-card-demo");
+
+    const realHtml = postCard(makePost({ isDemo: false }), cardOpts);
+    expect(realHtml).not.toContain("🤖 Demo");
+    expect(realHtml).not.toContain("post-card-demo");
+  });
+
+  it("renders the Which One? tag only for a WHICH_ONE post, independent of demo status", () => {
+    const comparisonHtml = postCard(makePost({ mode: "WHICH_ONE" }), cardOpts);
+    expect(comparisonHtml).toContain("Which One?");
+
+    const buyPassHtml = postCard(makePost({ mode: "BUY_PASS" }), cardOpts);
+    expect(buyPassHtml).not.toContain("Which One?");
+
+    const demoComparisonHtml = postCard(makePost({ mode: "WHICH_ONE", isDemo: true }), cardOpts);
+    expect(demoComparisonHtml).toContain("🤖 Demo");
+    expect(demoComparisonHtml).toContain("Which One?");
+  });
+
+  it("never shows a fabricated vote statistic: zero real opinions renders as an explicit 'No opinions yet', not a 0% bar implying real engagement", () => {
+    const html = postCard(makePost(), { ...cardOpts, buyCount: 0, passCount: 0 });
+    expect(html).toContain("No opinions yet");
+    expect(html).not.toContain("stat-bar-fill");
+  });
+
+  it("a comparison post with zero real opinions also renders 'No opinions yet', not a fabricated comparison count", () => {
+    const html = postCard(makePost({ mode: "WHICH_ONE" }), { ...cardOpts, comparisonOpinionCount: 0 });
+    expect(html).toContain("No opinions yet");
+  });
+});
+
+describe("referenceCard: real-world reference rendering", () => {
+  const baseRef = {
+    id: "ref-test",
+    title: "A real external discussion",
+    categoryId: "computing",
+    categoryName: "Computing & Tech",
+    sourceUrl: "https://forums.example.com/thread/123",
+    sourcePlatform: "Example Forums",
+    sourceDate: "2020-01-01",
+    summary: "A verified summary of the real discussion.",
+    knownGaps: "The final purchase was never confirmed.",
+    imageUrl: null as string | null,
+    imageIsRepresentative: false,
+  };
+
+  it("always shows the external badge and never any vote-stat markup", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain("External discussion — not a Buy or Pass post");
+    expect(html).not.toContain("stat-bar-fill");
+    expect(html).not.toContain("post-card-demo");
+  });
+
+  it("links to the real source URL with rel=noopener noreferrer and opens in a new tab", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain(`href="${baseRef.sourceUrl}"`);
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it("links 'Ask your own version' to /posts/new with the reference's own category preselected", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain(`/posts/new?category=${baseRef.categoryId}`);
+  });
+
+  it("shows a 'Representative photo' tag only when an image is present and marked representative", () => {
+    const withRepImage = referenceCard({ ...baseRef, imageUrl: "/static/assets/references/x.jpg", imageIsRepresentative: true });
+    expect(withRepImage).toContain("Representative photo");
+
+    const withExactImage = referenceCard({ ...baseRef, imageUrl: "/static/assets/references/x.jpg", imageIsRepresentative: false });
+    expect(withExactImage).not.toContain("Representative photo");
+
+    const withNoImage = referenceCard({ ...baseRef, imageUrl: null, imageIsRepresentative: true });
+    expect(withNoImage).not.toContain("Representative photo");
+    expect(withNoImage).toContain("reference-card-image-placeholder");
+  });
+
+  it("always renders the knownGaps text, never hiding what the source doesn't say", () => {
+    const html = referenceCard(baseRef);
+    expect(html).toContain("The final purchase was never confirmed.");
   });
 });

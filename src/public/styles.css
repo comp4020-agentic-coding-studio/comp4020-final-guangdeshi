@@ -1,66 +1,118 @@
 /* ===========================================================================
-   Buy or Pass — Design System
-   Art direction: "editorial shopping magazine meets social feed." Warm,
-   light paper-like background; a serif display face (Fraunces) for voice
-   and personality on headlines, a clean grotesque (Inter) for everything
-   functional. Buy and Pass get their own deliberate, high-contrast colors
-   (not a generic green/red pair) so a stance reads instantly even at a
-   glance across a whole feed. See docs/design/DESIGN_SYSTEM.md for the
-   full rationale.
+   Buy or Pass — "Decision Studio" Design System (v2.0 visual refinement)
+
+   Approved hybrid direction, three parts working on different surfaces of
+   the same page rather than diluting into one generic look:
+     - Editorial Commerce: brand identity, typography, product imagery,
+       overall visual hierarchy. A confident serif display face, a deep
+       wine/burgundy brand color (not a warm terracotta), generous
+       whitespace and real type-weight contrast between a heading and its
+       supporting text.
+     - Comparison Lab: the WHICH_ONE comparison surface specifically —
+       aligned numeric prices (tabular-nums), consistent card structure for
+       scanning across options, a visible, unambiguous selected state, and
+       a cool, slightly desaturated neutral background (not warm cream)
+       that reads as "precise" rather than "cozy."
+     - Human-centred Social: the vote/comment/community surfaces — the
+       Buy/Pass toggle, opinion list, influential-opinion marker — stay
+       warm, legible, low-friction, and unapologetically simple; this is
+       where the product's actual social mechanism lives and it should
+       never feel like a spreadsheet.
+
+   This replaced a prior palette (warm cream #FAF6F0 background, terracotta
+   #D9603B accent) found during the visual audit to sit within ~10-36 units
+   (max ~441) of Anthropic's own frontend-design skill's explicit
+   calibration example of a default "AI-generated-looking" palette — close
+   enough to read as a template default rather than a considered choice for
+   this specific product. The replacement below is 12+ units further from
+   that calibration point on the background and ~4x further on the accent,
+   while keeping every text/background pairing at or above WCAG AA (verified
+   with the relative-luminance contrast formula, not eyeballed — the lowest
+   ratio in the palette, muted text on the base background, is 5.85:1,
+   comfortably above the 4.5:1 floor for body text).
    =========================================================================== */
 
 :root {
-  --color-paper: #faf6f0;
+  /* Cool, slightly blue-gray neutral — "lab paper," not warm cream. Still
+     light and comfortable for long reading, but reads as considered and
+     precise rather than cozy, matching the Comparison Lab half of the
+     brief. */
+  --color-paper: #f3f4f6;
   --color-paper-raised: #ffffff;
-  --color-ink: #1f1a17;
-  --color-ink-muted: #6b6059;
-  --color-ink-faint: #9b9089;
-  --color-border: #e8ddd0;
-  --color-border-strong: #d8c9b6;
+  --color-paper-sunken: #e7e9ec;
+  --color-ink: #181a1f;
+  --color-ink-muted: #585f6b;
+  --color-ink-faint: #8a8f99;
+  --color-border: #d9dce1;
+  --color-border-strong: #b9bec7;
 
-  --color-brand: #d9603b;
-  --color-brand-dark: #b84a2a;
-  --color-brand-light: #fdeee6;
+  /* Deep wine/burgundy — an editorial, serious color with no relation to
+     Anthropic's own terracotta/clay accent family, chosen to read as
+     "a considered publication's brand mark," not a generic warm SaaS
+     accent. */
+  --color-brand: #6e2a3a;
+  --color-brand-dark: #4e1e29;
+  --color-brand-light: #f4e5e8;
 
+  /* Buy/Pass keep their own deliberate, high-contrast colors — the
+     Human-centred Social half of the brief — independent of the brand
+     color, so a stance reads instantly at a glance across a whole feed
+     regardless of which brand color surrounds it. */
   --color-buy: #1f7a4d;
-  --color-buy-bg: #e6f5ec;
-  --color-buy-dark: #15502f;
-  --color-pass: #c0392b;
-  --color-pass-bg: #fbe9e5;
-  --color-pass-dark: #8f2a1f;
+  --color-buy-bg: #e3f3ea;
+  --color-buy-dark: #12512f;
+  --color-pass: #b33b2a;
+  --color-pass-bg: #f8e7e3;
+  --color-pass-dark: #8a2a1e;
 
   --color-success: #1f7a4d;
-  --color-error: #c0392b;
+  --color-error: #b33b2a;
 
   --font-display: "Fraunces", Georgia, serif;
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --shadow-card: 0 1px 2px rgba(31, 26, 23, 0.04), 0 8px 24px -12px rgba(31, 26, 23, 0.18);
-  --shadow-raised: 0 4px 12px rgba(31, 26, 23, 0.08), 0 16px 40px -16px rgba(31, 26, 23, 0.22);
+  /* Deliberately not one radius for every surface (the "SaaS-card kit"
+     tell the audit flagged): a sharper radius for dense, scannable
+     comparison/data surfaces, a softer one for editorial/social content
+     cards, and a larger one reserved for a handful of hero-level
+     containers. */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-comparison: 4px;
+  --shadow-card: 0 1px 2px rgba(10, 12, 20, 0.05), 0 6px 18px -10px rgba(10, 12, 20, 0.22);
+  --shadow-raised: 0 4px 14px rgba(10, 12, 20, 0.1), 0 18px 44px -18px rgba(10, 12, 20, 0.28);
 
   --container-width: 1180px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-paper: #1a1613;
-    --color-paper-raised: #241e1a;
-    --color-ink: #f3ece4;
-    --color-ink-muted: #b8aca1;
-    --color-ink-faint: #85786d;
-    --color-border: #3a322b;
-    --color-border-strong: #4a4038;
-    --color-brand-light: #3a241a;
-    --color-buy-bg: #163626;
+    --color-paper: #15171b;
+    --color-paper-raised: #1e2025;
+    --color-paper-sunken: #0f1114;
+    --color-ink: #eceef1;
+    --color-ink-muted: #a8adb8;
+    --color-ink-faint: #767c88;
+    --color-border: #30333a;
+    --color-border-strong: #42464e;
+    --color-brand-light: #38232a;
+    --color-buy-bg: #133626;
     --color-pass-bg: #3a2420;
   }
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* The `hidden` attribute's UA-default `display: none` loses to any class
+   that sets its own `display` (e.g. .btn's `display: inline-flex` on
+   #add-option-btn) unless reasserted with higher specificity — found via
+   actual browser verification of the "+ Add option" button failing to hide
+   at the 4-option cap, not by inspection. */
+[hidden] {
+  display: none !important;
 }
 
 html {
@@ -91,6 +143,28 @@ a {
 img {
   max-width: 100%;
   display: block;
+}
+
+/* A consistent, deliberately visible focus ring for every interactive
+   element reached via Tab — found missing during the visual-audit's
+   accessibility pass: links and .btn elements were relying on the
+   browser's own default outline (1px, barely visible against the dark
+   --color-brand button fill) rather than a ring this design system
+   actually chose. :focus-visible (not :focus) so a mouse click never shows
+   the ring, only real keyboard navigation does. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.btn:focus-visible {
+  outline-offset: 3px;
 }
 
 .muted {
@@ -239,6 +313,44 @@ img {
   object-fit: cover;
 }
 
+/* Hamburger toggle: hidden entirely above the mobile breakpoint, where the
+   inline .main-nav/.nav-right row has room. A real <button>, not a <div
+   onclick>, so it's keyboard-reachable and gets a focus ring for free. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nav-toggle-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--color-ink);
+  border-radius: 1px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(2) {
+  opacity: 0;
+}
+.nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.mobile-nav-panel {
+  display: none;
+}
+
 /* --------------------------------------------------------------- footer */
 
 .site-footer {
@@ -265,18 +377,12 @@ img {
   margin: 0 auto;
   text-align: center;
 }
-.hero-eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--color-brand-dark);
-  margin-bottom: 1rem;
-}
 .hero-title {
   font-size: clamp(2.2rem, 5vw, 3.6rem);
+  font-weight: 700;
   margin-bottom: 0.6em;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
 }
 .hero-sub {
   font-size: 1.15rem;
@@ -356,12 +462,39 @@ img {
   font-size: clamp(1.5rem, 3vw, 2.1rem);
 }
 .definition-card p {
-  color: #d8cfc6;
+  color: #c7cad1;
   max-width: 560px;
   margin: 0 auto 1.2em;
 }
 .definition-card .link-more {
-  color: var(--color-brand);
+  color: #e8b4bf;
+}
+
+/* Section 7's honest-empty-state: shown instead of a bare "no posts" box
+   when the real feed has nothing yet. Never implies the demo cards below
+   it are real activity — the explanatory copy and each card's own "Demo"
+   tag (postCard() in src/render.ts) carry that distinction, this card just
+   frames why they're there. */
+.section-new-platform {
+  padding-top: 0.5rem;
+}
+.new-platform-card {
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 2rem 2rem 1.6rem;
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+}
+.new-platform-card h2 {
+  font-size: 1.4rem;
+  margin-bottom: 0.5em;
+}
+.new-platform-card p {
+  color: var(--color-ink-muted);
+  max-width: 480px;
+  margin: 0 auto 1.3em;
 }
 
 /* ----------------------------------------------------------- post grid */
@@ -494,14 +627,62 @@ img {
 }
 .search-form input {
   flex: 1;
+  /* A flex item's default min-width is `auto` (its own content size), not
+     0 — found via the visual audit's screenshot of this input showing the
+     placeholder "Search purchasing questions…" clipped to "...questior" at
+     narrower widths, because the browser refused to shrink the input past
+     a width it judged comfortable for that text rather than the space
+     actually available next to the Search button. */
+  min-width: 0;
+}
+/* Three content-source views (All questions / Community / Demo examples),
+   deliberately styled as real tabs (underline + aria-current), distinct
+   from the pill-shaped category filter directly below it — two different
+   kinds of filter (which posts are even eligible vs. which category) read
+   as visually different controls rather than one long row of identical
+   pills a visitor has to parse to tell apart. */
+.source-tabs {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.source-tab {
+  text-decoration: none;
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 0.8em 0.1em;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.source-tab-active {
+  color: var(--color-brand-dark);
+  border-bottom-color: var(--color-brand);
+}
+.discover-intro {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 1rem 1.5rem 0;
+  color: var(--color-ink-muted);
+  font-size: 0.92rem;
 }
 .category-pills {
   max-width: var(--container-width);
   margin: 0 auto;
-  padding: 0 1.5rem 1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
   display: flex;
   gap: 0.6rem;
   overflow-x: auto;
+  /* A horizontally-scrollable row with no visual cue reads as "the content
+     is cut off," not "scroll for more" — flagged in the audit screenshot
+     where the pill row ended abruptly at the viewport edge. A soft fade on
+     the trailing edge (mask-image, not an extra DOM element) signals more
+     content continues without needing JS to detect scroll position. */
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
 }
 .sort-toggle {
   max-width: var(--container-width);
@@ -650,6 +831,110 @@ textarea {
   object-fit: cover;
   border-radius: var(--radius-sm);
 }
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.field-group-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* ---------------------------------------------------------- image upload
+   A real drop target (not a bare <input type=file>, which the design audit
+   flagged as the one clearly-unstyled control on an otherwise-designed
+   page) that still is just a <label> wrapping the native input — clicking
+   or dragging anywhere in it opens the OS picker for free, and it stays a
+   real file input for keyboard/screen-reader users (Tab to it, Enter/Space
+   opens the native dialog, exactly as a bare input would). app.js adds the
+   live thumbnail preview and the "dragging" hover state; both are
+   enhancements over a control that already works without any JS. */
+.file-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-sunken);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+  overflow: hidden;
+}
+.file-drop:hover {
+  border-color: var(--color-brand);
+}
+.file-drop.file-drop-dragging {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+}
+.file-drop:focus-within {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+.file-drop-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.file-drop-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--color-ink-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.5rem;
+  pointer-events: none;
+}
+.file-drop-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--color-ink-faint);
+}
+.file-drop-option {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+}
+.file-drop-option .file-drop-text {
+  font-size: 0.72rem;
+}
+.file-drop-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.file-drop-multi {
+  flex-direction: column;
+  min-height: 110px;
+  padding: 1rem;
+}
+.file-drop-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.file-drop-preview-row:not(:empty) {
+  margin-top: 0.7rem;
+}
+.file-drop-preview-row img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+}
 .visibility-fieldset {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -746,6 +1031,7 @@ textarea {
   font-size: 1.4rem;
   font-weight: 700;
   margin: 0 0 1em;
+  font-variant-numeric: tabular-nums;
 }
 .post-detail-description {
   white-space: pre-wrap;
@@ -950,19 +1236,46 @@ textarea {
   padding: 1rem 1.2rem;
   box-shadow: var(--shadow-card);
 }
+/* Wraps instead of overflowing: a long handle plus a stance badge and the
+   influential marker can't fit one 390px row, so the handle may break and
+   badges/time drop to the next line (audit finding, 2026-11-03). */
 .opinion-item-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.4rem 0.7rem;
   margin-bottom: 0.4em;
+  min-width: 0;
 }
 .opinion-author {
   font-weight: 700;
   text-decoration: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.opinion-item-head .stance-badge,
+.opinion-item-head .influential-badge {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+/* A comparison pick shows the option's full product name, which can be long. */
+.opinion-item-head .stance-selected {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .opinion-time {
   font-size: 0.8rem;
   margin-left: auto;
+  white-space: nowrap;
+}
+.opinion-item,
+.opinion-comment {
+  overflow-wrap: anywhere;
+}
+.opinion-delete-form {
+  margin-top: 0.5rem;
+  text-align: right;
 }
 .opinion-comment {
   margin: 0;
@@ -1210,6 +1523,577 @@ textarea {
   color: var(--color-ink-muted);
   margin-bottom: 1.5em;
 }
+/* Discover's per-source/category empty state offers real, specific ways
+   out (reset the category, look at demo examples) rather than a single
+   generic action — a huge blank page with nothing but an icon is exactly
+   what this replaces. */
+.empty-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  margin-bottom: 1.2em;
+}
+
+/* ===========================================================================
+   Buy or Pass v2.0 — Adaptive Context, Which One? comparison mode, demo
+   content, and influential-opinion marker. Additive only: every selector
+   below is new, nothing above this block was restructured, so a BUY_PASS
+   post with no context/options/demo flag renders pixel-identical to before.
+   =========================================================================== */
+
+/* ------------------------------------------------- mode / create-edit form */
+
+.mode-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-bottom: 1.1rem;
+}
+.mode-fieldset legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.4em;
+}
+
+.context-prompts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.context-prompt-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* Redesigned per the design-audit's "2800px wall of repeated inputs"
+   finding: each candidate product is its own visually distinct card
+   (background + border, not just a thin fieldset rule), with the two
+   fields someone fills in for every option — a photo and the name/price —
+   always visible, and the five genuinely-optional fields tucked behind a
+   closed-by-default <details> (see optionFormBlock in src/pages.ts). On
+   wide screens cards sit side-by-side, mirroring the comparison-grid layout
+   the reader will eventually see on the published post, so filling out the
+   form already looks like building a comparison rather than filling out a
+   repeated questionnaire. */
+.option-form-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.option-form-block {
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-comparison);
+  box-shadow: var(--shadow-card);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.option-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.option-form-block legend {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.option-form-main {
+  display: flex;
+  gap: 0.8rem;
+}
+.option-form-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+/* Grid items default to min-width: auto, i.e. their own content-based
+   minimum — for a <label> wrapping an <input>, that minimum ignored the
+   3fr/2fr track ratio below and rendered both tracks at roughly equal
+   width anyway (confirmed via getBoundingClientRect: 65px vs 64px, not
+   the ~87/58 a 3:2 split should have produced), clipping the price
+   placeholder exactly the way .search-form input's own min-width: 0 fix
+   already had to solve once before in this file. */
+.option-form-block .form-row > label {
+  min-width: 0;
+}
+/* minmax(0, 1fr) for price (shrinkable, takes remaining space) and a fixed
+   68px for currency (just enough for "AUD" plus padding/border at this
+   font size, confirmed by filling the field and screenshotting it — an
+   earlier 3fr/2fr attempt still rendered the real value "AUD" clipped to
+   "AU…" because a fr-based split only changes the *ratio*, not whether
+   either track is actually wide enough for its own content). */
+.option-form-block .form-row {
+  grid-template-columns: minmax(0, 1fr) 68px;
+}
+/* The option card's own two-column inner layout (photo + fields) leaves
+   barely 150px for the price/currency pair — the global input padding
+   (0.9em each side) is fine everywhere else but visibly crowds a 4-char
+   "0.00" placeholder here, so it's tightened specifically in this
+   context rather than globally. Chromium's native number-input spinner
+   arrows eat further into that already-narrow box independent of padding
+   (confirmed directly: padding alone left "0.00" still clipped to
+   "0.0…" in a screenshot) — hidden here only, since type="number" is
+   kept for its real keyboard/validation behavior, just not its spinner
+   chrome, in this one width-constrained spot. */
+.option-form-block .form-row input {
+  padding-left: 0.6em;
+  padding-right: 0.5em;
+}
+.option-form-block .form-row input[type="number"]::-webkit-inner-spin-button,
+.option-form-block .form-row input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.option-form-block .form-row input[type="number"] {
+  -moz-appearance: textfield;
+}
+.option-more-details summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-brand-dark);
+}
+.option-more-details summary .hint {
+  font-weight: 400;
+}
+.option-more-details-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+/* -------------------------------------------------------- context display */
+
+.context-section {
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.2rem;
+}
+.context-section h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.7em;
+}
+.context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.9rem;
+}
+.context-item {
+  background: var(--color-paper);
+  border-radius: var(--radius-sm);
+  padding: 0.7em 0.9em;
+}
+.context-item-freetext {
+  grid-column: 1 / -1;
+}
+.context-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-ink-faint);
+  margin-bottom: 0.3em;
+}
+.context-value {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+/* --------------------------------------------- comparison mode: voting UI */
+
+.option-select-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.option-select {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.8em 1em;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border-strong);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.option-select input {
+  width: auto;
+  position: absolute;
+  opacity: 0;
+}
+.option-select.selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+.option-select-none {
+  border-style: dashed;
+}
+
+.stance-selected {
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+.stance-none {
+  background: var(--color-border);
+  color: var(--color-ink-muted);
+}
+
+.outcome-option-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.outcome-purchased {
+  font-weight: 600;
+}
+
+/* ------------------------------------------- comparison mode: the grid ---
+   Desktop: a real side-by-side CSS Grid, 2-4 cards, each option's photo
+   given strong visual weight. Mobile (see the responsive block below):
+   a horizontally swipeable scroll-snap track instead of a long vertical
+   stack, per the explicitly approved comparison-UI scope. */
+
+.comparison-section {
+  max-width: var(--container-width);
+  margin: 0 auto 1.5rem;
+  padding: 0 1.5rem;
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.2rem;
+}
+/* Core-journey reorder: a WHICH_ONE post has no single product photo to
+   anchor a two-column layout against (each option carries its own image),
+   so the info column runs full-width above the comparison grid instead —
+   this is the actual fix for the audit's "comparison content buried below
+   the fold" finding, not just a cosmetic change. */
+.post-detail-comparison .post-detail-grid {
+  grid-template-columns: 1fr;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.comparison-action {
+  max-width: 640px;
+  margin: 1.5rem auto 0;
+}
+.purchase-option-card {
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-comparison);
+  box-shadow: var(--shadow-card);
+  padding: 1rem;
+  border: 2px solid transparent;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.purchase-option-selected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+  position: relative;
+}
+.purchase-option-selected::before {
+  content: "✓ Your pick";
+  position: absolute;
+  top: -11px;
+  left: 14px;
+  background: var(--color-brand);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2em 0.7em;
+  border-radius: 999px;
+}
+.purchase-option-image,
+.purchase-option-image-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--color-border);
+}
+.purchase-option-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+}
+.purchase-option-name {
+  font-size: 1.02rem;
+  margin: 0.3em 0 0;
+}
+.purchase-option-price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  /* Comparison Lab requirement: prices across cards should align digit-for-
+     digit for fast scanning (also a Vercel Web Interface Guidelines rule
+     for any numeric column used for comparison), not just visually "look
+     aligned" with a proportional font where a "1" and a "0" take different
+     widths. */
+  font-variant-numeric: tabular-nums;
+}
+.purchase-option-original-price {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-ink-faint);
+  text-decoration: line-through;
+}
+.purchase-option-sale-note {
+  color: var(--color-brand-dark);
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin: 0;
+}
+.purchase-option-condition,
+.purchase-option-source {
+  font-size: 0.82rem;
+  color: var(--color-ink-muted);
+  margin: 0;
+}
+.purchase-option-specs {
+  margin: 0.3em 0 0;
+  padding-left: 1.1em;
+  font-size: 0.82rem;
+  color: var(--color-ink-muted);
+}
+.purchase-option-vote-count {
+  margin: 0.4em 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+.comparison-none-count {
+  margin-top: 0.8rem;
+}
+
+/* ---------------------------------------------- influenced-my-decision ---*/
+
+.influential-mark-form {
+  margin-top: 0.5em;
+}
+.btn-tiny {
+  padding: 0.3em 0.7em;
+  font-size: 0.74rem;
+}
+.influential-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-brand-dark);
+  background: var(--color-brand-light);
+  padding: 0.2em 0.6em;
+  border-radius: 999px;
+}
+.opinion-item-influential {
+  border: 2px solid var(--color-brand);
+}
+
+/* ----------------------------------------------------------- demo content */
+
+.demo-banner {
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.7em 1em;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.2rem;
+}
+.demo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-brand-dark);
+  background: var(--color-brand-light);
+  padding: 0.25em 0.7em;
+  border-radius: 999px;
+  margin-bottom: 0.5em;
+}
+.post-card-tag.demo-tag-overlay {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  left: auto;
+  background: var(--color-brand);
+  color: white;
+}
+.post-card-tag.comparison-tag {
+  position: absolute;
+  bottom: 0.6rem;
+  right: 0.6rem;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+}
+.stat-comparison-count {
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* --------------------------------------------------- reference card */
+/* Deliberately echoes .post-card's shape (radius, shadow, image aspect) so
+   it reads as part of the same design system, while its own badge/CTA
+   layout keeps it visually distinct from a voteable local post. */
+.reference-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  border: 1px dashed var(--color-border);
+}
+.reference-card-image {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--color-border);
+  overflow: hidden;
+}
+.reference-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.reference-card-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, var(--color-border), var(--color-paper));
+}
+.reference-card-category {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 0.6rem;
+  background: rgba(31, 26, 23, 0.72);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+}
+.reference-card-tag.representative-tag {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+}
+.reference-card-body {
+  padding: 1rem 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.reference-external-badge {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  background: var(--color-paper);
+  border: 1px solid var(--color-border);
+  padding: 0.25em 0.7em;
+  border-radius: 999px;
+}
+.reference-card-title {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.reference-card-meta {
+  font-size: 0.8rem;
+  color: var(--color-ink-muted);
+  margin: 0;
+}
+.reference-card-summary {
+  font-size: 0.9rem;
+  margin: 0;
+}
+.reference-card-gaps {
+  font-size: 0.82rem;
+  color: var(--color-ink-muted);
+  margin: 0;
+}
+.reference-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  margin-top: 0.4em;
+}
+/* "Ask your own version of this question" is long enough to overflow a
+   narrow card column under .btn's default white-space: nowrap (found via an
+   actual screenshot — the label was clipping at the card edge, not just
+   visually tight). Letting it wrap here is scoped to these two buttons only,
+   not a change to .btn globally. */
+.reference-card-actions .btn {
+  white-space: normal;
+  text-align: center;
+  width: 100%;
+}
+
+/* ------------------------------------------------------ related decisions */
+
+.related-section {
+  grid-column: 1 / -1;
+  margin-top: 2rem;
+}
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.related-decision-card {
+  display: block;
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  padding: 0.9rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.related-decision-card h4 {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0 0 0.3em;
+}
+.related-decision-card p {
+  margin: 0;
+  font-size: 0.82rem;
+}
 
 /* ------------------------------------------------------------ responsive */
 
@@ -1234,16 +2118,59 @@ textarea {
   .wordmark {
     font-size: 1.15rem;
   }
-  .main-nav {
-    gap: 0.8rem;
-    font-size: 0.85rem;
-  }
+  /* The inline nav row (.main-nav + .nav-right) is what overflowed a 390px
+     viewport once logged in — Discover, My activity, +New post, the
+     avatar, and Log out all competing for one row with no way to shrink.
+     Below this breakpoint that row is replaced by a single hamburger
+     button opening .mobile-nav-panel as a full-width dropdown, so no
+     element is ever forced to compete for horizontal space. */
+  .main-nav,
   .nav-right {
+    display: none;
+  }
+  .nav-toggle {
+    display: flex;
+  }
+  .mobile-nav-panel:not([hidden]) {
+    display: block;
+    border-top: 1px solid var(--color-border);
+    padding: 1rem;
+    background: var(--color-paper);
+  }
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin-bottom: 1.1rem;
+  }
+  .mobile-nav-links .nav-link {
+    font-size: 1.05rem;
+  }
+  .mobile-nav-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+  .mobile-nav-actions .nav-avatar-link {
+    display: flex;
+    align-items: center;
     gap: 0.6rem;
   }
-  .nav-right .btn-small {
-    padding: 0.5em 0.8em;
-    font-size: 0.8rem;
+  .mobile-nav-actions .nav-avatar-link::after {
+    content: "View profile";
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+  .mobile-nav-actions form.inline-form {
+    display: block;
+  }
+  .mobile-nav-actions .as-button {
+    width: 100%;
+    text-align: left;
+    font-size: 1.05rem;
+    padding: 0.4em 0;
   }
   .hero {
     padding: 2.5rem 1rem 2rem;
@@ -1252,9 +2179,21 @@ textarea {
     flex-direction: column;
     align-items: stretch;
   }
-  .section, .post-detail, .discover-header, .category-pills, .profile-header, .profile-edit-details {
+  .section, .post-detail, .discover-header, .category-pills, .source-tabs, .profile-header, .profile-edit-details {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+  /* "All questions" and "Demo examples" wrap onto two lines at 390px,
+     making the tab row an uneven height — found in an actual mobile
+     screenshot, not assumed. Horizontal scroll (same pattern as the
+     category pills row just below it) keeps every tab label on one line
+     instead of shrinking or truncating the text. */
+  .source-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .source-tab {
+    flex-shrink: 0;
   }
   .form-row {
     grid-template-columns: 1fr;
@@ -1280,4 +2219,333 @@ textarea {
   .admin-log-row span:nth-child(7) {
     display: none;
   }
+
+  /* Comparison mode on a phone: horizontally swipeable scroll-snap cards
+     instead of a long vertical stack of 2-4 full-width cards, per the
+     approved comparison-UI scope ("avoid a very long vertical list of four
+     products... clear navigation indicators"). Each card locks edge-to-edge
+     as the user swipes; a thin dot row beneath (rendered by nothing more
+     than CSS scroll-snap's natural stop points) isn't added as extra DOM —
+     the cards' own partial-peek of the next card is the navigation cue. */
+  .comparison-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .purchase-option-card {
+    scroll-snap-align: start;
+    flex: 0 0 82%;
+  }
+  .related-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================ catalog */
+/* Real product catalog: image-led cards on a white product stage (the
+   catalog photos are packshots on white), compact text, one explicit
+   action. Uses the existing Decision Studio tokens only. */
+.discover-header > div { min-width: 0; }
+.discover-header .discover-intro { padding: 0.3rem 0 0; margin: 0; }
+.discover-main {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+}
+.discover-count {
+  color: var(--color-ink-muted);
+  font-size: 0.88rem;
+  margin: 0 0 1rem;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1.25rem;
+}
+.product-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-raised);
+}
+.product-card-link {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+/* The image box is a fixed 4:3 regardless of the photo's own proportions:
+   the <img> is absolutely positioned inside an inset, so a tall tripod or a
+   wide sofa never changes the card's height (found via screenshot — an
+   in-flow img with width/height attributes let its intrinsic height win). */
+.product-card-image {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #ffffff;
+  border-bottom: 1px solid var(--color-paper-sunken);
+  overflow: hidden;
+}
+.product-card-image img {
+  position: absolute;
+  inset: 0.9rem 1.2rem;
+  width: calc(100% - 2.4rem);
+  height: calc(100% - 1.8rem);
+  object-fit: contain;
+}
+.product-card-body {
+  padding: 0.75rem 1rem 0.3rem;
+}
+.product-card-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  margin: 0 0 0.3em;
+}
+.product-card-title {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 0.3em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.product-card-attr {
+  font-size: 0.82rem;
+  color: var(--color-ink-muted);
+  margin: 0;
+}
+.product-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem 0.9rem;
+}
+.product-card-questions {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-brand-dark);
+}
+.product-card-ask { margin-left: auto; }
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2rem;
+}
+.pager-status {
+  color: var(--color-ink-muted);
+  font-size: 0.88rem;
+}
+
+/* ------------------------------------------------------ product detail */
+.breadcrumb {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 0;
+  font-size: 0.85rem;
+  color: var(--color-ink-muted);
+}
+.product-detail {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 1rem 1.5rem 2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: start;
+}
+.product-detail-media img {
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+.product-credit {
+  font-size: 0.75rem;
+  color: var(--color-ink-faint);
+  margin-top: 0.6rem;
+}
+.product-detail-title {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  margin: 0 0 0.3em;
+}
+.product-detail-attr {
+  color: var(--color-ink-muted);
+  margin: 0 0 1.2rem;
+}
+.product-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.product-facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin: 1.5rem 0 1rem;
+  border-top: 1px solid var(--color-border);
+}
+.product-facts > div {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+.product-facts dt { color: var(--color-ink-muted); }
+.product-facts dd { margin: 0; overflow-wrap: anywhere; }
+.product-features summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.product-features ul {
+  font-size: 0.88rem;
+  color: var(--color-ink-muted);
+  padding-left: 1.2rem;
+}
+.product-questions-empty {
+  background: var(--color-paper-raised);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.product-questions-empty p { margin: 0; color: var(--color-ink-muted); }
+[data-compare-toggle].is-selected {
+  background: var(--color-brand-light);
+  border-color: var(--color-brand);
+  color: var(--color-brand-dark);
+}
+
+/* comparison tray (product pages) */
+.compare-tray {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 2rem));
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 50;
+}
+.compare-tray[hidden] { display: none; }
+.compare-tray-text {
+  flex: 1;
+  font-size: 0.88rem;
+  min-width: 0;
+}
+.compare-tray .btn-ghost { color: var(--color-paper); border-color: rgba(255,255,255,0.4); }
+
+/* catalog selection on the create form */
+.catalog-selection {
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 1rem 1.1rem;
+  margin: 1rem 0 1.5rem;
+}
+.catalog-selection-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-ink-faint);
+  margin: 0 0 0.6rem;
+}
+.catalog-selection-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+}
+.catalog-selection-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.catalog-selection-item img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  flex-shrink: 0;
+}
+.catalog-selection-item .hint { display: block; }
+.option-form-block-catalog .file-drop-preview { object-fit: contain; background: #fff; }
+
+/* catalog photos inside post cards / detail / options are white packshots */
+.post-card-image img.post-card-image-catalog,
+.purchase-option-image-catalog,
+.post-gallery-catalog img {
+  object-fit: contain;
+  background: #ffffff;
+}
+.post-card-image img.post-card-image-catalog { padding: 0.75rem; box-sizing: border-box; }
+.post-catalog-link {
+  display: inline-block;
+  font-size: 0.88rem;
+  margin: 0 0 0.8rem;
+  color: var(--color-brand-dark);
+}
+.credits .credit-source {
+  background: var(--color-paper-raised);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.2rem;
+  margin-top: 1rem;
+  box-shadow: var(--shadow-card);
+}
+
+@media (max-width: 860px) {
+  .product-detail { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 640px) {
+  .discover-main, .breadcrumb, .product-detail { padding-left: 1rem; padding-right: 1rem; }
+  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+  .product-card-image img { inset: 0.5rem; width: calc(100% - 1rem); height: calc(100% - 1rem); }
+  .product-card-body { padding: 0.6rem 0.7rem 0.2rem; }
+  .product-card-title { font-size: 0.88rem; }
+  .product-card-attr { display: none; }
+  .product-card-actions { padding: 0.4rem 0.7rem 0.8rem; flex-direction: column; align-items: stretch; }
+  .product-card-ask { margin-left: 0; width: 100%; min-height: 44px; }
+  .product-facts > div { grid-template-columns: 6.5rem 1fr; }
 }

@@ -114,6 +114,67 @@ export async function submitOpinion(session: Session, postId: string, stance: "B
   });
 }
 
+/**
+ * Creates a WHICH_ONE-mode post with 2-4 options, mirroring createPost()'s
+ * conventions (FormData multipart, same csrf/visibility handling) — returns
+ * the new post's id so a test can then fetch it to recover the real option
+ * ids out of the rendered page (the create response's redirect carries no
+ * JSON, and option ids are server-generated, so a test can't predict them).
+ */
+export async function createComparisonPost(
+  session: Session,
+  options: Array<{ name: string; priceCents: number }>,
+  overrides?: Partial<{ title: string; description: string; category: string; visibility: "public" | "unlisted" }>,
+): Promise<string> {
+  const form = new FormData();
+  form.set("csrf", session.csrfToken);
+  form.set("mode", "WHICH_ONE");
+  form.set("title", overrides?.title ?? "Which one should I get?");
+  form.set("description", overrides?.description ?? "Comparing a few options, want opinions.");
+  form.set("category", overrides?.category ?? "computing");
+  form.set("visibility", overrides?.visibility ?? "public");
+  options.forEach((opt, i) => {
+    form.set(`option_name_${i}`, opt.name);
+    form.set(`option_price_${i}`, (opt.priceCents / 100).toFixed(2));
+    form.set(`option_currency_${i}`, "AUD");
+  });
+
+  const res = await fetch(new URL("/posts/new", baseUrl()), {
+    method: "POST",
+    redirect: "manual",
+    headers: { Cookie: cookieHeader(session) },
+    body: form,
+  });
+  if (res.status !== 303) {
+    throw new Error(`comparison post creation failed: ${res.status} ${await res.text()}`);
+  }
+  const location = res.headers.get("location")!;
+  const match = location.match(/\/posts\/([a-f0-9-]{36})/);
+  if (!match) throw new Error(`could not parse post id from redirect: ${location}`);
+  return match[1];
+}
+
+/** Scrapes the server-rendered option ids off a WHICH_ONE post's detail page, in display order — the only way a test can learn them, since they're server-generated UUIDs. */
+export async function getOptionIds(postId: string): Promise<string[]> {
+  const res = await fetch(new URL(`/posts/${postId}`, baseUrl()));
+  const html = await res.text();
+  return [...html.matchAll(/data-option-id="([a-f0-9-]{36})"/g)].map((m) => m[1]);
+}
+
+export async function submitComparisonOpinion(
+  session: Session,
+  postId: string,
+  selection: { optionId: string } | { none: true },
+  comment: string,
+): Promise<Response> {
+  const selectedOptionId = "optionId" in selection ? selection.optionId : "none";
+  return apiCall(session, `/posts/${postId}/opinions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ csrf: session.csrfToken, selectedOptionId, comment }),
+  });
+}
+
 // A real, decodable 200x200 PNG generated on demand — large enough to clear
 // images.ts's minimum-dimension validation, used as a stand-in product photo
 // across tests. Cached after the first call since every test using it wants

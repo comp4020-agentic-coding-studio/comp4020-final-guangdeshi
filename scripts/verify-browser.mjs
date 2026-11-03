@@ -2,13 +2,16 @@
 // isolated real browser contexts to confirm the multi-user realtime
 // requirement end-to-end, and captures screenshots at the three required
 // viewports plus key flows. Run with: node scripts/verify-browser.mjs
-// Expects the app already running at APP_URL (default localhost:8080) with
-// RATE_LIMIT_SCALE set high enough not to block this script's own
-// registrations (see package.json's "dev:test" script).
+// Expects a disposable test server at APP_URL (`pnpm dev:test`, or any
+// server started with BOP_DISPOSABLE_DB=1 and a throwaway database); it
+// refuses to run against anything else.
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
-const BASE = process.env.APP_URL ?? "http://localhost:8080";
+import { requireDisposableTarget } from "./test-target-guard.mjs";
+
+const BASE = process.env.APP_URL;
+await requireDisposableTarget(BASE);
 mkdirSync("screenshots", { recursive: true });
 
 function log(msg) {
@@ -161,7 +164,62 @@ async function main() {
   const readmeTitle = await pageA.textContent("h1");
   log(`/readme/ h1: "${readmeTitle}"`);
 
-  const allTimings = { elapsedOpinion, elapsedStanceChange };
+  // ---- v2.0 Feature B: Which One? comparison mode, two-browser live flow ----
+  // Mirrors the Buy/Pass flow above exactly (A posts, B opens and votes, A
+  // watches live) but for a WHICH_ONE post with two options, to confirm the
+  // comparison-specific SSE payload (optionCounts, not stance counts) also
+  // propagates live without a reload.
+  await pageA.goto(`${BASE}/posts/new`);
+  await pageA.check('input[name="mode"][value="WHICH_ONE"]');
+  await pageA.fill('input[name="title"]', "Which laptop for a CS degree?");
+  await pageA.selectOption('select[name="category"]', "computing");
+  await pageA.fill('textarea[name="description"]', "Comparing a budget laptop against a pricier one for four years of coursework.");
+  await pageA.fill('input[name="option_name_0"]', "Budget Windows laptop");
+  await pageA.fill('input[name="option_price_0"]', "899");
+  await pageA.fill('input[name="option_name_1"]', "Premium ultrabook");
+  await pageA.fill('input[name="option_price_1"]', "1899");
+  await pageA.click('form.post-form button[type="submit"]');
+  await pageA.waitForURL(/\/posts\/[a-f0-9-]{36}$/);
+  const comparisonPostUrl = pageA.url();
+  log(`A created a Which One? comparison post: ${comparisonPostUrl}`);
+  await pageA.screenshot({ path: "screenshots/comparison-post-author-view.png", fullPage: true });
+
+  await pageB.goto(comparisonPostUrl);
+  await pageB.waitForSelector(".comparison-opinion-form");
+  await pageA.goto(comparisonPostUrl); // A reopens to watch live
+  await pageA.waitForLoadState("networkidle");
+
+  const firstOptionRadio = pageB.locator(".option-select").first().locator("input");
+  await firstOptionRadio.check();
+  await pageB.fill('textarea[name="comment"]', "The budget laptop covers everything a CS degree actually needs.");
+  const t2 = Date.now();
+  await pageB.click(".comparison-opinion-form button[type=submit]");
+  await pageA.waitForFunction(
+    () => document.querySelector(".purchase-option-vote-count")?.textContent?.includes("1"),
+    { timeout: 5000 },
+  );
+  const elapsedComparisonVote = Date.now() - t2;
+  log(`A saw B's live comparison vote after ${elapsedComparisonVote}ms (no reload)`);
+  await pageA.screenshot({ path: "screenshots/comparison-post-live-update-on-A.png", fullPage: true });
+
+  // Mobile scroll-snap comparison view (approved comparison-UI scope: a
+  // horizontally swipeable track, not a long vertical stack).
+  const mobileComparisonCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobileComparisonPage = await mobileComparisonCtx.newPage();
+  await mobileComparisonPage.goto(comparisonPostUrl);
+  await mobileComparisonPage.waitForLoadState("networkidle");
+  await mobileComparisonPage.screenshot({ path: "screenshots/comparison-post-mobile.png", fullPage: true });
+  const comparisonOverflowX = await mobileComparisonPage
+    .locator(".comparison-grid")
+    .evaluate((el) => getComputedStyle(el).overflowX);
+  log(`mobile comparison-grid overflow-x = ${comparisonOverflowX} (expect "auto")`);
+  if (comparisonOverflowX !== "auto") {
+    console.error("FAIL: mobile comparison grid is not horizontally scrollable");
+    process.exitCode = 1;
+  }
+  await mobileComparisonCtx.close();
+
+  const allTimings = { elapsedOpinion, elapsedStanceChange, elapsedComparisonVote };
   const allUnderOneSecondish = Object.values(allTimings).every((ms) => ms < 1500);
   log(`All realtime propagation timings: ${JSON.stringify(allTimings)}`);
   log(`All comfortably under ~1-1.5s: ${allUnderOneSecondish}`);

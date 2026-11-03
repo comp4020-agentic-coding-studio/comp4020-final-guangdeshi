@@ -6,8 +6,18 @@
 import { chromium } from "playwright";
 import { DatabaseSync } from "node:sqlite";
 
-const BASE = process.env.APP_URL ?? "http://localhost:8080";
-const DB_PATH = process.env.DATABASE_PATH ?? "./data/buyorpass.test.sqlite";
+import { requireDisposableTarget } from "./test-target-guard.mjs";
+
+const BASE = process.env.APP_URL;
+await requireDisposableTarget(BASE);
+// This script promotes its test user to admin by writing to the server's
+// database file directly, so it must be told exactly which file that is —
+// never a default that could be some other environment's database.
+const DB_PATH = process.env.DATABASE_PATH;
+if (!DB_PATH || /preview/i.test(DB_PATH)) {
+  console.error("Refusing to run: set DATABASE_PATH to the disposable test server's own database file.");
+  process.exit(2);
+}
 
 function log(msg) {
   console.log(`[verify-admin] ${msg}`);
@@ -114,6 +124,64 @@ async function main() {
   log(`non-admin visiting /admin got status: ${deniedRes.status()}`);
   if (deniedRes.status() !== 403) {
     console.error("FAIL: non-admin was not denied /admin with 403");
+    process.exitCode = 1;
+  }
+
+  // ---- v2.0 Feature D: admin-triggered demo-content seeding ----
+  const reporterSeedAttempt = await pageReporter.evaluate(async (url) => {
+    const res = await fetch(url, { method: "POST" });
+    return res.status;
+  }, `${BASE}/admin/demo/seed`);
+  log(`non-admin POST /admin/demo/seed got status: ${reporterSeedAttempt}`);
+  if (reporterSeedAttempt !== 403) {
+    console.error("FAIL: non-admin was not denied /admin/demo/seed with 403");
+    process.exitCode = 1;
+  }
+
+  const seedCsrf = await pageAdmin.evaluate(() => document.getElementById("admin-root")?.dataset.csrf);
+  const seedResult = await pageAdmin.evaluate(
+    async ({ url, csrf }) => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ csrf }),
+      });
+      return { status: res.status, body: await res.json() };
+    },
+    { url: `${BASE}/admin/demo/seed`, csrf: seedCsrf },
+  );
+  log(`admin POST /admin/demo/seed: status ${seedResult.status}, ${JSON.stringify(seedResult.body)}`);
+  if (seedResult.status !== 200) {
+    console.error("FAIL: admin demo seeding did not return 200");
+    process.exitCode = 1;
+  }
+
+  await pageAdmin.goto(`${BASE}/discover/demo`);
+  await pageAdmin.waitForSelector(".post-card-demo", { timeout: 5000 });
+  const demoCardCount = await pageAdmin.locator(".post-card-demo").count();
+  log(`Explore Demo feed shows ${demoCardCount} demo post card(s) after seeding`);
+  if (demoCardCount === 0) {
+    console.error("FAIL: no demo posts visible on /discover/demo after seeding");
+    process.exitCode = 1;
+  }
+  await pageAdmin.screenshot({ path: "screenshots/demo-feed-after-seed.png", fullPage: true });
+
+  // Re-running the seed must be an explicit no-op (idempotent), not a
+  // second batch of duplicate content.
+  const reseedResult = await pageAdmin.evaluate(
+    async ({ url, csrf }) => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ csrf }),
+      });
+      return res.json();
+    },
+    { url: `${BASE}/admin/demo/seed`, csrf: seedCsrf },
+  );
+  log(`re-running the seed: ${JSON.stringify(reseedResult)}`);
+  if (reseedResult.alreadySeeded !== true || reseedResult.postsCreated !== 0) {
+    console.error("FAIL: re-running demo seeding was not a no-op");
     process.exitCode = 1;
   }
 

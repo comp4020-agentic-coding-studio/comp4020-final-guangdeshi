@@ -60,8 +60,22 @@ fully recoverable from git history and the `crit-8` tag. In their place:
 - `realtime.test.ts` — subscribes to a post's SSE stream directly and
   confirms a second user's opinion arrives as a pushed event in well under a
   second.
+- `realtime-contract.test.ts` — the event contract in
+  `docs/adr/0005-realtime-event-contract.md`: which mutation emits which event
+  (new, edited, unlisted and deleted posts on the feed channel; edits,
+  removals, opinion deletions, outcomes and influential marks on the post
+  channel), that unlisted posts and rejected writes emit nothing, the login
+  return path for "Ask about this product" (including open-redirect
+  rejection), and opinion validation reached by an eligible non-owner.
 
-`scripts/verify-browser.mjs` and `scripts/verify-admin.mjs` cover the same
+The spec only runs against a disposable instance: `global-setup.ts` asks
+`/healthz/test-target`, and the server says yes only with
+`BOP_DISPOSABLE_DB=1`, never on Fly and never for the preview database. Use
+`pnpm dev:test`.
+
+`scripts/verify-realtime.mjs` is the two-user real-time acceptance
+regression: two simultaneously open browsers, every shared state change, and
+measured latency. `scripts/verify-browser.mjs` and `scripts/verify-admin.mjs` cover the same
 multi-user/realtime/authorization requirements end to end through real
 Chromium browser contexts (`pnpm test:browser`, `pnpm test:admin`) —
 run manually, not part of `pnpm check`, since they need Playwright's browser
