@@ -98,7 +98,14 @@ ${realFeedSection}
 
 // --------------------------------------------------------------- auth -----
 
-export function registerPage(viewer: ViewerContext, error: string | null, values: { email?: string; handle?: string; displayName?: string }): string {
+/** Hidden "return here after auth" field plus the matching ?next= suffix for the switch link; nothing when the destination is the default. */
+function authNext(next: string): { field: string; query: string } {
+  if (next === "/discover") return { field: "", query: "" };
+  return { field: `<input type="hidden" name="next" value="${escapeHtml(next)}" />`, query: `?next=${encodeURIComponent(next)}` };
+}
+
+export function registerPage(viewer: ViewerContext, error: string | null, values: { email?: string; handle?: string; displayName?: string }, next = "/discover"): string {
+  const n = authNext(next);
   const body = `
 <section class="auth-section">
   <div class="auth-card">
@@ -106,6 +113,7 @@ export function registerPage(viewer: ViewerContext, error: string | null, values
     <p class="muted">Join the community giving (and getting) honest buy-or-pass opinions.</p>
     ${flashBanner(error)}
     <form method="post" action="/register" class="form-stack" novalidate>
+      ${n.field}
       <label>Email
         <input type="email" name="email" required maxlength="254" autocomplete="email" value="${escapeHtml(values.email ?? "")}" />
       </label>
@@ -121,20 +129,22 @@ export function registerPage(viewer: ViewerContext, error: string | null, values
       </label>
       <button type="submit" class="btn btn-brand btn-large btn-block">Create account</button>
     </form>
-    <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+    <p class="auth-switch">Already have an account? <a href="/login${n.query}">Log in</a></p>
   </div>
 </section>`;
   return layout({ title: "Join Buy or Pass", viewer, body, bodyClass: "page-auth" });
 }
 
-export function loginPage(viewer: ViewerContext, error: string | null, values: { email?: string }): string {
+export function loginPage(viewer: ViewerContext, error: string | null, values: { email?: string }, next = "/discover"): string {
+  const n = authNext(next);
   const body = `
 <section class="auth-section">
   <div class="auth-card">
     <h1>Welcome back</h1>
-    <p class="muted">Log in to post, vote, and track your activity.</p>
+    <p class="muted">${next.startsWith("/posts/new") ? "Log in (or create a free account) to ask your question — you'll come straight back to it." : "Log in to post, vote, and track your activity."}</p>
     ${flashBanner(error)}
     <form method="post" action="/login" class="form-stack" novalidate>
+      ${n.field}
       <label>Email
         <input type="email" name="email" required autocomplete="email" value="${escapeHtml(values.email ?? "")}" />
       </label>
@@ -143,7 +153,7 @@ export function loginPage(viewer: ViewerContext, error: string | null, values: {
       </label>
       <button type="submit" class="btn btn-brand btn-large btn-block">Log in</button>
     </form>
-    <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
+    <p class="auth-switch">New here? <a href="/register${n.query}">Create an account</a></p>
   </div>
 </section>`;
   return layout({ title: "Log in", viewer, body, bodyClass: "page-auth" });
@@ -315,7 +325,7 @@ export function discoverPage(
 </section>
 <nav class="source-tabs" aria-label="Browse">${viewTabs}</nav>
 <nav class="category-pills" aria-label="Filter by category">${categoryPills}</nav>
-<section class="discover-main">${main}</section>`;
+<section class="discover-main" data-live-region="feed" data-live-feed>${main}</section>`;
   return layout({ title: "Discover", viewer, activeNav: "discover", body, bodyClass: "page-discover" });
 }
 
@@ -366,7 +376,7 @@ export function productDetailPage(viewer: ViewerContext, data: ProductDetailData
   </div>
 </article>
 
-<section class="section product-questions" id="questions">
+<section class="section product-questions" id="questions" data-live-region="feed" data-live-feed>
   <div class="section-header"><h2>Community questions about this product</h2></div>
   ${questions.length > 0
     ? `<div class="post-grid">${questions.map((q) => postCard(q.post, q)).join("\n")}</div>`
@@ -527,7 +537,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         <button type="submit" class="btn btn-brand btn-block">${myOpinion ? "Update my opinion" : "Submit opinion"}</button>
       </form>`;
 
-  const opinionForm = !viewer.user
+  const opinionFormInner = !viewer.user
     ? `<div class="opinion-cta"><p>Log in to share your honest opinion.</p><a href="/login" class="btn btn-brand">Log in to vote</a></div>`
     : isAuthor
     ? `<div class="opinion-cta"><p>Post authors don't vote on their own posts — opinions should come from the community, not confirm your own thinking.</p></div>`
@@ -536,6 +546,17 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
     : isComparison
     ? comparisonForm
     : buyPassForm;
+  // Withdrawing your own opinion (POST /opinions/:id/delete — ownership is
+  // checked server-side in handleOpinionMutation).
+  const deleteOwnOpinion = myOpinion && viewer.user && !isAuthor
+    ? `<form method="post" action="/opinions/${myOpinion.id}/delete" class="opinion-delete-form">
+        <input type="hidden" name="csrf" value="${escapeHtml(viewer.csrfToken ?? "")}" />
+        <button type="submit" class="btn btn-ghost btn-tiny">Delete my opinion</button>
+      </form>`
+    : "";
+  // The viewer's own form: refreshed live only while it holds no unsaved
+  // input (app.js checks before swapping), so a draft is never overwritten.
+  const opinionForm = `<div data-live-region="opinion-form">${opinionFormInner}${deleteOwnOpinion}</div>`;
 
   const outcomeOptionRow = isComparison && options.length > 0
     ? `<label class="outcome-option-select">Which one did you buy, if any?
@@ -546,7 +567,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       </label>`
     : "";
 
-  const outcomeSection = isAuthor
+  const outcomeInner = isAuthor
     ? `<div class="outcome-card">
         <h3>What did you decide?</h3>
         <form method="post" action="/posts/${post.id}/outcome" class="outcome-form">
@@ -566,6 +587,11 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         outcome.purchasedOptionId ? `<p class="outcome-purchased">Bought: ${escapeHtml(optionNameFor(options, outcome.purchasedOptionId) ?? "an option")}</p>` : ""
       }${outcome.reflection ? `<p class="outcome-reflection">${escapeHtml(outcome.reflection)}</p>` : ""}</div>`
     : "";
+  // Live regions: each data-live-region below is re-rendered server-side for
+  // this same viewer and swapped in by app.js when a post event arrives, so
+  // author-only controls, the outcome and the influential marker always
+  // match the server (docs/adr/0005-realtime-event-contract.md).
+  const outcomeSection = `<div data-live-region="outcome">${outcomeInner}</div>`;
 
   const influentialId = data.influentialOpinionId ?? outcome?.influentialOpinionId ?? null;
   const opinionsList = opinions.length > 0
@@ -579,7 +605,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
                 <button type="submit" class="btn btn-ghost btn-tiny">${isInfluential ? "Unmark influential" : "Mark as influential"}</button>
               </form>`
             : "";
-          return `<div class="opinion-item${isInfluential ? " opinion-item-influential" : ""}" data-opinion-user="${o.userId}">
+          return `<div class="opinion-item${isInfluential ? " opinion-item-influential" : ""}" data-opinion-user="${o.userId}" data-opinion-id="${o.id}">
           <div class="opinion-item-head">
             <a href="/u/${encodeURIComponent(o.authorHandle)}" class="opinion-author">@${escapeHtml(o.authorHandle)}</a>
             ${opinionBadge(o, optionNameFor(options, o.selectedOptionId), "small")}
@@ -614,16 +640,16 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
     ? `<div class="demo-banner" role="note">🤖 Demo scenario — AI-generated fictional content</div>`
     : "";
 
-  const contextSection = contextCard(data.context ?? null, data.contextPrompts ?? []);
+  const contextSection = `<div data-live-region="context">${contextCard(data.context ?? null, data.contextPrompts ?? [])}</div>`;
 
   const comparisonCounts = data.optionCounts ?? { counts: {}, noneCount: 0 };
   const comparisonGrid = isComparison
-    ? `<div class="comparison-grid">
+    ? `<div data-live-region="comparison"><div class="comparison-grid">
         ${options
           .map((opt) => purchaseOptionCard(opt, comparisonCounts.counts[opt.id] ?? 0, myOpinion?.selectedOptionId === opt.id, data.optionCatalogImages?.[opt.id] ?? null))
           .join("\n")}
       </div>
-      ${comparisonCounts.noneCount > 0 ? `<p class="muted comparison-none-count">✋ ${comparisonCounts.noneCount} said none of these</p>` : ""}`
+      ${comparisonCounts.noneCount > 0 ? `<p class="muted comparison-none-count">✋ ${comparisonCounts.noneCount} said none of these</p>` : ""}</div>`
     : "";
 
   const relatedSection = data.relatedPosts && data.relatedPosts.length > 0
@@ -633,7 +659,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       </section>`
     : "";
 
-  const buyPassSummary = `<div class="opinion-summary" id="opinion-summary">
+  const buyPassSummary = `<div class="opinion-summary" id="opinion-summary" data-live-region="summary">
         <div class="opinion-counts">
           <span class="count-buy" id="count-buy">👍 ${buyCount} Buy</span>
           <span class="count-pass" id="count-pass">👎 ${passCount} Pass</span>
@@ -641,7 +667,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         <div class="stat-bar stat-bar-large"><span class="stat-bar-fill" id="buy-pct-bar" style="width:${buyPct}%"></span></div>
       </div>`;
 
-  const headerBlock = `${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted — share link only</span>` : ""}
+  const headerBlock = `<div data-live-region="header">${post.visibility === "unlisted" ? `<span class="post-card-tag unlisted-tag">Unlisted — share link only</span>` : ""}
       <span class="post-detail-category">${escapeHtml(category.name)}</span>
       <h1>${escapeHtml(post.title)}</h1>
       <p class="post-detail-meta">by <a href="/u/${encodeURIComponent(author.handle)}">@${escapeHtml(author.handle)}</a> · ${timeAgo(post.createdAt)}</p>
@@ -651,7 +677,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
         : ""}
       <p class="post-detail-description">${escapeHtml(post.description)}</p>
       ${post.tags.length > 0 ? `<div class="tag-row">${post.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join("")}</div>` : ""}
-      ${ownerControls}`;
+      ${ownerControls}</div>`;
 
   // Reading order (approved core-journey redesign): purchasing question →
   // buyer context → product/options → simple opinion action → community
@@ -679,7 +705,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
   ${flashBanner(flash.message, flash.kind)}
   ${demoBanner}
   <div class="post-detail-grid">
-    ${isComparison ? "" : `<div class="post-detail-media">${gallery}</div>`}
+    ${isComparison ? "" : `<div class="post-detail-media" data-live-region="gallery">${gallery}</div>`}
     <div class="post-detail-info">
       ${mainColumn}
     </div>
@@ -695,7 +721,7 @@ export function postDetailPage(viewer: ViewerContext, data: PostDetailData, flas
       </section>`
     : ""}
 
-  <section class="opinions-section">
+  <section class="opinions-section" data-live-region="opinions">
     <h2>Opinions (<span id="opinion-count">${opinions.length}</span>)</h2>
     <div id="opinions-list" class="opinions-list">${opinionsList}</div>
   </section>

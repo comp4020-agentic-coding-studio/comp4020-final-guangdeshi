@@ -1,8 +1,78 @@
-// Vanilla browser JS, no build step. Two independent SSE consumers:
-//  - post detail pages subscribe to /posts/:id/events for live opinion/count
-//    updates (see initPostDetail);
+// Vanilla browser JS, no build step. Three independent SSE consumers:
+//  - post detail pages subscribe to /posts/:id/events (see initPostDetail);
+//  - Discover's Questions view and a product page's question list subscribe
+//    to /discover/events (see initLiveFeed);
 //  - the admin page subscribes to /admin/events for the live log + polls
 //    /admin/api/stats and /admin/api/reports (see initAdmin).
+//
+// Post and feed pages share one rule (docs/adr/0005-realtime-event-contract.md):
+// an event only says WHAT changed. The page then refetches its own URL — the
+// server renders it for this same viewer, with this viewer's permissions and
+// filters — and swaps in every [data-live-region]. So author-only controls,
+// outcomes, influential markers, edits and deletions always match the
+// database, and nothing private can arrive over SSE. Reconnects run the same
+// reconcile, which repairs anything missed while disconnected.
+
+/**
+ * Refetch-and-swap for every [data-live-region] on the page. Coalesces bursts
+ * (one fetch in flight, at most one queued) and drops a response if a newer
+ * fetch has started since — so out-of-order responses never roll the page
+ * back to older state.
+ */
+function createLiveReconciler({ shouldSkip, onSwapped, onGone } = {}) {
+  let latestStarted = 0;
+  let inFlight = false;
+  let queued = false;
+
+  async function run() {
+    if (inFlight) {
+      queued = true;
+      return;
+    }
+    inFlight = true;
+    const ticket = ++latestStarted;
+    try {
+      const res = await fetch(location.pathname + location.search, {
+        headers: { Accept: "text/html", "X-Live-Reconcile": "1" },
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (res.status === 404) {
+        onGone?.();
+        return;
+      }
+      if (!res.ok || ticket !== latestStarted) return;
+      const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+      document.querySelectorAll("[data-live-region]").forEach((region) => {
+        const name = region.dataset.liveRegion;
+        const fresh = doc.querySelector(`[data-live-region="${name}"]`);
+        if (!fresh) {
+          region.innerHTML = "";
+          return;
+        }
+        if (shouldSkip?.(region)) return;
+        if (region.innerHTML !== fresh.innerHTML) region.innerHTML = fresh.innerHTML;
+      });
+      onSwapped?.();
+    } catch {
+      // Network blip: the EventSource reconnect will trigger another run.
+    } finally {
+      inFlight = false;
+      if (queued) {
+        queued = false;
+        run();
+      }
+    }
+  }
+  return run;
+}
+
+/** True while a form region holds focus or text the server doesn't have yet. */
+function regionHasDraft(region) {
+  if (region.contains(document.activeElement) && document.activeElement !== document.body) return true;
+  return [...region.querySelectorAll("textarea, input[type=text]")].some((el) => el.value !== el.defaultValue);
+}
+
 function initPostDetail() {
   const article = document.querySelector(".post-detail[data-post-id]");
   if (!article) return;
@@ -10,9 +80,35 @@ function initPostDetail() {
   const postMode = article.dataset.postMode;
   const label = document.getElementById("live-connection-label");
 
-  const source = new EventSource(`/posts/${postId}/events`);
-  source.addEventListener("open", () => label?.setAttribute("data-connected", "true"));
+  const reconcile = createLiveReconciler({
+    // The viewer's own opinion form and the author's outcome form are only
+    // refreshed when they hold no unsaved input.
+    shouldSkip: (region) => (region.dataset.liveRegion === "opinion-form" || region.dataset.liveRegion === "outcome") && regionHasDraft(region),
+    onGone: () => {
+      if (document.querySelector(".live-banner-removed")) return;
+      const banner = document.createElement("div");
+      banner.className = "flash flash-error live-banner live-banner-removed";
+      banner.setAttribute("role", "status");
+      banner.textContent = "This post was removed by its author.";
+      article.prepend(banner);
+      article.querySelectorAll("form").forEach((f) => f.querySelectorAll("button, input, textarea, select").forEach((el) => (el.disabled = true)));
+    },
+  });
 
+  const source = new EventSource(`/posts/${postId}/events`);
+  let connectedOnce = false;
+  source.addEventListener("open", () => {
+    label?.setAttribute("data-connected", "true");
+    // Every (re)connect reconciles with the server, since events sent while
+    // disconnected are not replayed.
+    if (connectedOnce) reconcile();
+    connectedOnce = true;
+  });
+  source.addEventListener("error", () => label?.setAttribute("data-connected", "false"));
+
+  // Opinion events: apply the payload immediately for a fast visible update,
+  // then reconcile so viewer-specific controls (the author's "Mark as
+  // influential", markers, the viewer's own "your pick") come from the server.
   source.addEventListener("opinion-upserted", (event) => {
     const payload = JSON.parse(event.data);
     if (postMode === "WHICH_ONE") {
@@ -22,26 +118,18 @@ function initPostDetail() {
       upsertOpinionDom(payload.opinion);
       updateCounts(payload.counts);
     }
+    reconcile();
   });
 
   source.addEventListener("opinion-deleted", (event) => {
-    const { opinionId, counts } = JSON.parse(event.data);
-    document.querySelector(`[data-opinion-user="${opinionId}"]`)?.remove();
-    if (counts) updateCounts(counts);
+    const { opinionId, counts, optionCounts } = JSON.parse(event.data);
+    document.querySelector(`#opinions-list [data-opinion-id="${opinionId}"]`)?.remove();
+    if (postMode === "WHICH_ONE") updateOptionCounts(optionCounts);
+    else if (counts) updateCounts(counts);
+    reconcile();
   });
 
-  source.addEventListener("outcome-updated", () => {
-    // Outcome rendering has author-vs-viewer branches server-side; simplest
-    // correct behavior on a live outcome change is a one-time soft reload of
-    // just that section's HTML would be nicer, but reloading preserves
-    // scroll poorly. For now, show a banner inviting refresh — Buy/Pass
-    // counts (the primary real-time requirement) already update live without
-    // one.
-    const banner = document.createElement("div");
-    banner.className = "flash flash-success live-banner";
-    banner.textContent = "The author just recorded a purchase outcome — refresh to see it.";
-    article.prepend(banner);
-  });
+  for (const type of ["post-updated", "outcome-updated", "post-removed"]) source.addEventListener(type, () => reconcile());
 
   function updateCounts(counts) {
     const buyEl = document.getElementById("count-buy");
@@ -69,9 +157,7 @@ function initPostDetail() {
       }
     });
     const noneEl = document.querySelector(".comparison-none-count");
-    if (noneEl && optionCounts.noneCount > 0) {
-      noneEl.textContent = `✋ ${optionCounts.noneCount} said none of these`;
-    }
+    if (noneEl) noneEl.textContent = `✋ ${optionCounts.noneCount} said none of these`;
     const countEl = document.getElementById("opinion-count");
     if (countEl) {
       const total = Object.values(optionCounts.counts).reduce((a, b) => a + b, 0) + optionCounts.noneCount;
@@ -83,91 +169,91 @@ function initPostDetail() {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  function upsertOpinionDom(opinion) {
+  // Fast path only: replaces or inserts the row keyed by opinion id (one
+  // current opinion per account means a changed opinion keeps its id). The
+  // reconcile that follows replaces it with the server's full rendering.
+  function placeOpinionRow(opinion, html) {
     const list = document.getElementById("opinions-list");
     if (!list) return;
-    const existing = list.querySelector(`[data-opinion-user="${opinion.userId}"]`);
-    const stanceLabel = opinion.stance === "BUY" ? "👍 Buy" : "👎 Pass";
-    const stanceClass = opinion.stance === "BUY" ? "stance-buy" : "stance-pass";
-    const html = `
-      <div class="opinion-item-head">
-        <a href="/u/${encodeURIComponent(opinion.authorHandle)}" class="opinion-author">@${escapeHtml(opinion.authorHandle)}</a>
-        <span class="stance-badge stance-badge-small ${stanceClass}">${stanceLabel}</span>
-        <span class="opinion-time muted">just now</span>
-      </div>
-      <p class="opinion-comment">${escapeHtml(opinion.comment)}</p>`;
-
+    const existing = list.querySelector(`[data-opinion-id="${opinion.id}"]`) ?? list.querySelector(`[data-opinion-user="${opinion.userId}"]`);
     if (existing) {
       existing.innerHTML = html;
+      existing.dataset.opinionId = opinion.id;
       existing.classList.add("opinion-item-flash");
     } else {
-      const emptyMsg = list.querySelector("p.muted");
-      emptyMsg?.remove();
+      list.querySelector(":scope > p.muted")?.remove();
       const div = document.createElement("div");
       div.className = "opinion-item opinion-item-flash";
       div.dataset.opinionUser = opinion.userId;
+      div.dataset.opinionId = opinion.id;
       list.prepend(div);
       div.innerHTML = html;
     }
   }
 
-  // Comparison-mode equivalent of upsertOpinionDom: badge shows the picked
-  // option name (or "None of these") instead of a Buy/Pass stance. Live
-  // updates never know the influential-marker state of a brand new row, so
-  // a freshly-arrived opinion simply never shows the ⭐ badge until reload —
-  // consistent with outcome-updated's own "refresh for the full picture"
-  // compromise above.
+  function upsertOpinionDom(opinion) {
+    const stanceLabel = opinion.stance === "BUY" ? "👍 Buy" : "👎 Pass";
+    const stanceClass = opinion.stance === "BUY" ? "stance-buy" : "stance-pass";
+    placeOpinionRow(opinion, `
+      <div class="opinion-item-head">
+        <a href="/u/${encodeURIComponent(opinion.authorHandle)}" class="opinion-author">@${escapeHtml(opinion.authorHandle)}</a>
+        <span class="stance-badge stance-badge-small ${stanceClass}">${stanceLabel}</span>
+        <span class="opinion-time muted">just now</span>
+      </div>
+      <p class="opinion-comment">${escapeHtml(opinion.comment)}</p>`);
+  }
+
+  // Comparison-mode equivalent: the badge shows the picked option's name,
+  // looked up from the comparison card already on the page.
   function upsertComparisonOpinionDom(opinion) {
-    const list = document.getElementById("opinions-list");
-    if (!list) return;
-    const existing = list.querySelector(`[data-opinion-user="${opinion.userId}"]`);
-    // The broadcast payload carries only the option id, not its name — the
-    // name is looked up from the comparison card already on the page rather
-    // than re-sent over SSE, since every viewer of this page already has
-    // the full option list rendered.
     const optionName = opinion.selectedOptionId
       ? document.querySelector(`.purchase-option-card[data-option-id="${opinion.selectedOptionId}"] .purchase-option-name`)?.textContent
       : null;
     const badge = opinion.selectedNone
       ? `<span class="stance-badge stance-none stance-badge-small">✋ None of these</span>`
       : `<span class="stance-badge stance-selected stance-badge-small">✅ ${escapeHtml(optionName ?? "an option")}</span>`;
-    const html = `
+    placeOpinionRow(opinion, `
       <div class="opinion-item-head">
         <a href="/u/${encodeURIComponent(opinion.authorHandle)}" class="opinion-author">@${escapeHtml(opinion.authorHandle)}</a>
         ${badge}
         <span class="opinion-time muted">just now</span>
       </div>
-      <p class="opinion-comment">${escapeHtml(opinion.comment)}</p>`;
-
-    if (existing) {
-      existing.innerHTML = html;
-      existing.classList.add("opinion-item-flash");
-    } else {
-      const emptyMsg = list.querySelector("p.muted");
-      emptyMsg?.remove();
-      const div = document.createElement("div");
-      div.className = "opinion-item opinion-item-flash";
-      div.dataset.opinionUser = opinion.userId;
-      list.prepend(div);
-      div.innerHTML = html;
-    }
+      <p class="opinion-comment">${escapeHtml(opinion.comment)}</p>`);
   }
 
-  // Keep stance-toggle / option-select label styling in sync with the
-  // checked radio — same pattern for both the Buy/Pass toggle and the
-  // comparison-mode option-select row.
-  document.querySelectorAll(".stance-option input[type=radio]").forEach((input) => {
-    input.addEventListener("change", () => {
-      document.querySelectorAll(".stance-option").forEach((el) => el.classList.remove("selected"));
-      input.closest(".stance-option")?.classList.add("selected");
-    });
+  // Keep stance-toggle / option-select / outcome label styling in sync with
+  // the checked radio. Delegated, so forms swapped in by a reconcile keep it.
+  article.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== "radio") return;
+    for (const cls of ["stance-option", "option-select", "outcome-option"]) {
+      const label = input.closest(`.${cls}`);
+      if (!label) continue;
+      label.parentElement?.querySelectorAll(`.${cls}`).forEach((el) => el.classList.remove("selected"));
+      label.classList.add("selected");
+    }
   });
-  document.querySelectorAll(".option-select input[type=radio]").forEach((input) => {
-    input.addEventListener("change", () => {
-      document.querySelectorAll(".option-select").forEach((el) => el.classList.remove("selected"));
-      input.closest(".option-select")?.classList.add("selected");
-    });
+}
+
+/**
+ * Discover's Questions view and a product page's question list: refetch the
+ * current URL (same filters, sort and page) on any public-feed change and
+ * swap in the server-rendered list. Whether a new post belongs in this view
+ * is decided server-side by the same query that rendered the page.
+ */
+function initLiveFeed() {
+  const feed = document.querySelector("[data-live-feed]");
+  if (!feed) return;
+  const reconcile = createLiveReconciler();
+  const source = new EventSource("/discover/events");
+  let connectedOnce = false;
+  source.addEventListener("open", () => {
+    feed.dataset.liveConnected = "true";
+    if (connectedOnce) reconcile();
+    connectedOnce = true;
   });
+  source.addEventListener("error", () => (feed.dataset.liveConnected = "false"));
+  source.addEventListener("feed-changed", () => reconcile());
 }
 
 function initAdmin() {
@@ -622,6 +708,7 @@ function initCompareTray() {
 }
 
 initPostDetail();
+initLiveFeed();
 initCompareTray();
 initAdmin();
 initGallery();

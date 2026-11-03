@@ -126,7 +126,7 @@ import {
   type CatalogProduct,
 } from "./catalog.ts";
 import { recommendationService } from "./recommendation/chronological.ts";
-import { addLogClient, addPostClient, broadcastToPost, sseClientCounts, startHeartbeat } from "./sse.ts";
+import { addFeedClient, addLogClient, addPostClient, broadcastFeedChange, broadcastToPost, sseClientCounts, startHeartbeat } from "./sse.ts";
 import {
   normalizeTags,
   validateComparisonOpinionInput,
@@ -149,6 +149,15 @@ const COOKIE_NAME = "bop_session";
 // unchanged; only the test runner sets this (see package.json's "test"
 // script), and it defaults to 1 (unscaled) everywhere else, including prod.
 const RATE_LIMIT_SCALE = Math.max(1, Number(process.env.RATE_LIMIT_SCALE ?? 1));
+
+// Test-isolation guard (see spec/global-setup.ts and
+// scripts/test-target-guard.mjs): the spec and the browser scripts create
+// accounts and posts, so they refuse to run unless the target reports itself
+// disposable. That needs an explicit BOP_DISPOSABLE_DB=1 and is never true on
+// Fly (FLY_APP_NAME is set there) or for the local preview database — the
+// one that was once contaminated by a test run aimed at the wrong port.
+const IS_DISPOSABLE_INSTANCE =
+  process.env.BOP_DISPOSABLE_DB === "1" && !process.env.FLY_APP_NAME && !/preview/i.test(process.env.DATABASE_PATH ?? "");
 const MAX_BODY_BYTES = 256 * 1024; // non-multipart bodies only; images go through parseMultipart's own limit
 const README_PATH = process.env.README_PATH ?? "./README.md";
 
@@ -297,6 +306,36 @@ function requireAuth(ctx: RequestContext): AuthContext {
   return ctx.auth;
 }
 
+/** Whether a post is part of the public community feed (and so of feed events). */
+function isFeedVisible(post: Pick<Post, "status" | "visibility" | "isDemo">): boolean {
+  return post.status === "active" && post.visibility === "public" && !post.isDemo;
+}
+
+/**
+ * Tells feed viewers about a change to a post that is, or just stopped being,
+ * part of the public feed. A post that was never public (unlisted, demo)
+ * produces no feed event at all.
+ */
+function announceFeedChange(before: Post | null, after: Post | null): void {
+  const wasVisible = before ? isFeedVisible(before) : false;
+  const isVisible = after ? isFeedVisible(after) : false;
+  const id = (after ?? before)!.id;
+  if (!wasVisible && isVisible) broadcastFeedChange(id, "created");
+  else if (wasVisible && isVisible) broadcastFeedChange(id, "updated");
+  else if (wasVisible && !isVisible) broadcastFeedChange(id, "removed");
+}
+
+/**
+ * A relative, same-origin path to return to after logging in. Anything else
+ * (absolute URLs, protocol-relative "//host", backslashes, control
+ * characters) falls back to Discover, so ?next= can't become an open redirect.
+ */
+function safeNextPath(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 300) return "/discover";
+  if (!raw.startsWith("/") || raw.startsWith("//") || /[\\\s\x00-\x1f]/.test(raw)) return "/discover";
+  return raw;
+}
+
 // -------------------------------------------------------------- logging ---
 
 function log(ctx: RequestContext, action: Parameters<typeof logEvent>[0]["action"], status: "success" | "failure", opts?: { targetType?: string; targetId?: string; meta?: Record<string, unknown> }): void {
@@ -365,6 +404,7 @@ async function handle(ctx: RequestContext): Promise<void> {
   if (method === "GET" && path.startsWith("/static/")) return handleStatic(ctx);
   if (method === "GET" && path.startsWith("/images/")) return handleImage(ctx);
   if (method === "GET" && path === "/healthz") return sendJson(res, 200, { ok: true });
+  if (method === "GET" && path === "/healthz/test-target") return sendJson(res, 200, { disposable: IS_DISPOSABLE_INSTANCE });
 
   // ---- auth ----
   if (method === "GET" && path === "/register") return handleRegisterForm(ctx);
@@ -376,6 +416,7 @@ async function handle(ctx: RequestContext): Promise<void> {
   // ---- discover ----
   if (method === "GET" && path === "/discover") return handleDiscover(ctx);
   if (method === "GET" && path === "/discover/demo") return handleDemoFeed(ctx);
+  if (method === "GET" && path === "/discover/events") return handleFeedEvents(ctx);
   if (method === "GET" && path === "/showcase") return handleShowcase(ctx, "demo");
   if (method === "GET" && path === "/showcase/references") return handleShowcase(ctx, "references");
   if (method === "GET" && path === "/credits") return handleCredits(ctx);
@@ -481,7 +522,7 @@ function handleImage(ctx: RequestContext): void {
 // ---------------------------------------------------------------- auth ----
 
 function handleRegisterForm(ctx: RequestContext): void {
-  sendHtml(ctx.res, 200, registerPage(viewerContextOf(ctx), null, {}));
+  sendHtml(ctx.res, 200, registerPage(viewerContextOf(ctx), null, {}, safeNextPath(ctx.url.searchParams.get("next"))));
 }
 
 async function handleRegisterSubmit(ctx: RequestContext): Promise<void> {
@@ -495,10 +536,11 @@ async function handleRegisterSubmit(ctx: RequestContext): Promise<void> {
   const handle = normalizeHandle(String(body.fields.handle ?? ""));
   const displayName = String(body.fields.displayName ?? "").trim();
   const password = String(body.fields.password ?? "");
+  const next = safeNextPath(body.fields.next);
 
   const renderError = (msg: string) => {
     log(ctx, "auth.register_failed", "failure", { meta: { reason: msg } });
-    sendHtml(ctx.res, 400, registerPage(viewerContextOf(ctx), msg, { email, handle, displayName }));
+    sendHtml(ctx.res, 400, registerPage(viewerContextOf(ctx), msg, { email, handle, displayName }, next));
   };
 
   if (!isValidEmail(email)) return renderError("Please enter a valid email address.");
@@ -511,11 +553,11 @@ async function handleRegisterSubmit(ctx: RequestContext): Promise<void> {
   const user = createUser(email, handle, hashPassword(password), displayName);
   issueSessionCookies(ctx.res, user.id);
   log(ctx, "auth.registered", "success", { targetType: "user", targetId: user.id });
-  redirect(ctx.res, "/discover");
+  redirect(ctx.res, next);
 }
 
 function handleLoginForm(ctx: RequestContext): void {
-  sendHtml(ctx.res, 200, loginPage(viewerContextOf(ctx), null, {}));
+  sendHtml(ctx.res, 200, loginPage(viewerContextOf(ctx), null, {}, safeNextPath(ctx.url.searchParams.get("next"))));
 }
 
 async function handleLoginSubmit(ctx: RequestContext): Promise<void> {
@@ -523,6 +565,7 @@ async function handleLoginSubmit(ctx: RequestContext): Promise<void> {
   const ip = clientIp(ctx.req);
   const email = normalizeEmail(String(body.fields.email ?? ""));
   const password = String(body.fields.password ?? "");
+  const next = safeNextPath(body.fields.next);
 
   // Rate limit by IP AND by email, so one attacker can't hammer a single
   // victim account from many IPs, nor spray many accounts from one IP.
@@ -531,7 +574,7 @@ async function handleLoginSubmit(ctx: RequestContext): Promise<void> {
     !checkRateLimit(`login-email:${email}`, 8 * RATE_LIMIT_SCALE, 10 * 60 * 1000)
   ) {
     log(ctx, "auth.login_failed", "failure", { meta: { reason: "rate_limited" } });
-    sendHtml(ctx.res, 429, loginPage(viewerContextOf(ctx), "Too many attempts. Please wait a few minutes and try again.", { email }));
+    sendHtml(ctx.res, 429, loginPage(viewerContextOf(ctx), "Too many attempts. Please wait a few minutes and try again.", { email }, next));
     return;
   }
 
@@ -543,13 +586,13 @@ async function handleLoginSubmit(ctx: RequestContext): Promise<void> {
 
   if (!user || !passwordOk) {
     log(ctx, "auth.login_failed", "failure", { meta: { reason: "bad_credentials" } });
-    sendHtml(ctx.res, 401, loginPage(viewerContextOf(ctx), "Incorrect email or password.", { email }));
+    sendHtml(ctx.res, 401, loginPage(viewerContextOf(ctx), "Incorrect email or password.", { email }, next));
     return;
   }
 
   issueSessionCookies(ctx.res, user.id);
   log(ctx, "auth.logged_in", "success", { targetType: "user", targetId: user.id });
-  redirect(ctx.res, "/discover");
+  redirect(ctx.res, next);
 }
 
 const DUMMY_HASH = hashPassword(randomBytes(32).toString("hex"));
@@ -692,7 +735,9 @@ function handleCredits(ctx: RequestContext): void {
 // ---------------------------------------------------------------- posts ---
 
 function handleNewPostForm(ctx: RequestContext): void {
-  requireAuth(ctx);
+  // An anonymous visitor following "Ask about this product" goes to log in
+  // (with a link to register) and comes back to the same prefilled form.
+  if (!ctx.auth) return redirect(ctx.res, `/login?next=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`);
   // ?category= preselects the category dropdown (used by a real-world
   // reference's "Ask your own version of this question" link) — validated
   // against the real category list rather than trusted blindly, so an
@@ -842,6 +887,7 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
     }
     indexPostForSearch(post.id, post.title, post.description, [...Object.values(contextAnswers), freeText].join(" "));
     log(ctx, "post.created", "success", { targetType: "post", targetId: post.id, meta: { mode: "WHICH_ONE" } });
+    announceFeedChange(null, getPostById(post.id)!);
     redirect(ctx.res, `/posts/${post.id}`);
     return;
   }
@@ -887,6 +933,7 @@ async function handleCreatePost(ctx: RequestContext): Promise<void> {
   }
   indexPostForSearch(post.id, post.title, post.description, [...Object.values(contextAnswers), freeText].join(" "));
   log(ctx, "post.created", "success", { targetType: "post", targetId: post.id, meta: catalogProduct ? { catalogProductId: catalogProduct.id } : undefined });
+  announceFeedChange(null, getPostById(post.id)!);
   redirect(ctx.res, `/posts/${post.id}`);
 }
 
@@ -1069,7 +1116,8 @@ async function handleUpdatePost(ctx: RequestContext, postId: string): Promise<vo
     }
     indexPostForSearch(postId, input.title, input.description, [...Object.values(contextAnswers), freeText].join(" "));
     log(ctx, "post.updated", "success", { targetType: "post", targetId: postId });
-    broadcastToPost(postId, "post-updated", { postId });
+    broadcastToPost(postId, "post-updated", {});
+    announceFeedChange(post, getPostById(postId)!);
     redirect(ctx.res, `/posts/${postId}`);
     return;
   }
@@ -1110,7 +1158,8 @@ async function handleUpdatePost(ctx: RequestContext, postId: string): Promise<vo
   }
   indexPostForSearch(postId, updated.title, updated.description, [...Object.values(contextAnswers), freeText].join(" "));
   log(ctx, "post.updated", "success", { targetType: "post", targetId: updated.id });
-  broadcastToPost(postId, "post-updated", { postId });
+  broadcastToPost(postId, "post-updated", {});
+  announceFeedChange(post, getPostById(postId)!);
   redirect(ctx.res, `/posts/${postId}`);
 }
 
@@ -1128,6 +1177,8 @@ async function handleDeletePost(ctx: RequestContext, postId: string): Promise<vo
   softDeletePost(postId);
   removePostFromSearchIndex(postId);
   log(ctx, "post.deleted", "success", { targetType: "post", targetId: postId });
+  broadcastToPost(postId, "post-removed", {});
+  announceFeedChange(post, getPostById(postId)!);
   redirect(ctx.res, "/discover");
 }
 
@@ -1182,6 +1233,7 @@ async function handleSubmitOpinion(ctx: RequestContext, postId: string): Promise
     opinion: { id: opinion.id, userId: opinion.userId, stance: opinion.stance, comment: opinion.comment, updatedAt: opinion.updatedAt, authorHandle: auth.user.handle },
     counts,
   });
+  announceFeedChange(post, post);
 
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { opinion, counts });
   redirect(ctx.res, `/posts/${postId}`);
@@ -1245,6 +1297,7 @@ async function handleSubmitComparisonOpinion(ctx: RequestContext, post: Post, bo
     },
     optionCounts,
   });
+  announceFeedChange(post, post);
 
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { opinion, optionCounts });
   redirect(ctx.res, `/posts/${postId}`);
@@ -1270,7 +1323,10 @@ async function handleOpinionMutation(ctx: RequestContext, opinionId: string, act
     deleteOpinion(opinion.postId, opinion.userId);
     log(ctx, "opinion.deleted", "success", { targetType: "opinion", targetId: opinionId, meta: { postId: opinion.postId } });
     const counts = getOpinionCounts(opinion.postId);
-    broadcastToPost(opinion.postId, "opinion-deleted", { opinionId, userId: opinion.userId, counts });
+    const parent = getPostById(opinion.postId)!;
+    const optionCounts = parent.mode === "WHICH_ONE" ? getOptionCounts(opinion.postId) : undefined;
+    broadcastToPost(opinion.postId, "opinion-deleted", { opinionId, userId: opinion.userId, counts, optionCounts });
+    announceFeedChange(parent, parent);
     if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { ok: true, counts });
     return redirect(ctx.res, `/posts/${opinion.postId}`);
   }
@@ -1288,6 +1344,8 @@ async function handleOpinionMutation(ctx: RequestContext, opinionId: string, act
     opinion: { id: updated.id, userId: updated.userId, stance: updated.stance, comment: updated.comment, updatedAt: updated.updatedAt, authorHandle: auth.user.handle },
     counts,
   });
+  const parentPost = getPostById(opinion.postId)!;
+  announceFeedChange(parentPost, parentPost);
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { opinion: updated, counts });
   redirect(ctx.res, `/posts/${opinion.postId}`);
 }
@@ -1327,7 +1385,7 @@ async function handleSetInfluentialOpinion(ctx: RequestContext, postId: string, 
   const unmark = body.fields.action === "unmark";
   const outcome = setInfluentialOpinion(postId, unmark ? null : opinionId);
   log(ctx, "outcome.recorded", "success", { targetType: "post", targetId: postId, meta: { influentialOpinionSet: !unmark } });
-  broadcastToPost(postId, "outcome-updated", { outcome });
+  broadcastToPost(postId, "outcome-updated", { influentialOpinionId: outcome.influentialOpinionId });
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { outcome });
   redirect(ctx.res, `/posts/${postId}`);
 }
@@ -1368,7 +1426,7 @@ async function handleSetOutcome(ctx: RequestContext, postId: string): Promise<vo
 
   const outcome = upsertOutcome(postId, input.status as any, (input.reflection as string) ?? "", purchasedOptionId);
   log(ctx, "outcome.recorded", "success", { targetType: "post", targetId: postId, meta: { status: outcome.status } });
-  broadcastToPost(postId, "outcome-updated", { outcome });
+  broadcastToPost(postId, "outcome-updated", { status: outcome.status });
   if (wantsJson(ctx.req)) return sendJson(ctx.res, 200, { outcome });
   redirect(ctx.res, `/posts/${postId}`);
 }
@@ -1389,6 +1447,10 @@ async function handleReportPost(ctx: RequestContext, postId: string): Promise<vo
 function handlePostEvents(ctx: RequestContext, postId: string): void {
   if (!getPostById(postId)) throw new HttpError(404, "post not found");
   addPostClient(ctx.res, postId);
+}
+
+function handleFeedEvents(ctx: RequestContext): void {
+  addFeedClient(ctx.res);
 }
 
 // --------------------------------------------------------------- profile --

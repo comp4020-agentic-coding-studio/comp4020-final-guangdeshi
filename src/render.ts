@@ -205,7 +205,7 @@ export function postCard(
     : `<span class="stat-buy">👍 ${opts.buyCount}</span>
       <span class="stat-pass">👎 ${opts.passCount}</span>
       ${buyPct !== null ? `<span class="stat-bar"><span class="stat-bar-fill" style="width:${buyPct}%"></span></span>` : `<span class="stat-empty">No opinions yet</span>`}`;
-  return `<a href="/posts/${post.id}" class="post-card${post.isDemo ? " post-card-demo" : ""}">
+  return `<a href="/posts/${post.id}" class="post-card${post.isDemo ? " post-card-demo" : ""}" data-post-id="${post.id}">
   <div class="post-card-image">
     ${opts.coverImageId
       ? `<img src="/images/${opts.coverImageId}" alt="" loading="lazy" />`
