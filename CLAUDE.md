@@ -363,6 +363,14 @@ STAGE:     Buy or Pass v2.0 — a response to tutor feedback that the original
            transparent keyword-based historical-decision search, labelled
            demo content for an otherwise-empty community, and an optional
            "influenced my decision" marker — see docs/adr/0003 and 0004 and
-           PROCESS.md for the full record. Developed on
-           feature/buy-or-pass-v2; not yet deployed to the live Fly app.
+           PROCESS.md for the full record. Later work on the branch added a
+           real product catalog, /showcase, and live updates for every
+           shared change (ADR 0005).
+RELEASE:   v2.0 was merged to origin/main (7ac3504), but CI failed because
+           the image crashed on boot, so it never deployed. The live Fly app
+           still runs the pre-v2 build (7a14d4d). The fixes (image packaging
+           0345862, image-decode memory 4e1674b) are on
+           feature/buy-or-pass-v2 and not yet pushed. Releasing them means a
+           push to main, which auto-deploys and runs migrations 0003-0008 on
+           the live database, so it needs the student's explicit approval.
 ```
