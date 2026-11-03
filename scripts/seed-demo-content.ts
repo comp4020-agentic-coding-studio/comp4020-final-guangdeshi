@@ -39,6 +39,8 @@ import {
 } from "../src/db.ts";
 import { hashPassword } from "../src/auth.ts";
 import { CONTEXT_SCHEMA_VERSION } from "../src/context-prompts.ts";
+import { OUTPUT_MAX_DIMENSION } from "../src/images.ts";
+import { withImageSlot } from "../src/image-slot.ts";
 import {
   DEMO_GENERATION_METHOD,
   DEMO_MODEL_IDENTITY,
@@ -167,7 +169,19 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 async function storeRealImage(ownerUserId: string, key: Exclude<ImageKey, null>): Promise<string> {
   const sourcePath = join(SOURCE_IMAGE_DIR, REAL_SOURCE_FILES[key]);
-  const raw = await sharp(sourcePath).rotate().jpeg({ quality: 88 }).toBuffer();
+  // Bounded to the same output size as a real upload (src/images.ts). The
+  // sources run up to 5472x3648; re-encoding them at full size peaked the
+  // server at ~375MB RSS during one seed, against ~195MB with this bound
+  // (measured locally) — the 256MB machine can't afford the difference.
+  // Resizing in the same pipeline also lets libjpeg shrink on load. Seeding
+  // runs in the server process, so it shares the upload path's decode slot.
+  const raw = await withImageSlot(() =>
+    sharp(sourcePath)
+      .rotate()
+      .resize({ width: OUTPUT_MAX_DIMENSION, height: OUTPUT_MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 88 })
+      .toBuffer(),
+  );
   const meta = await sharp(raw).metadata();
   const id = randomUUID();
   const filename = `${id}.jpg`;
