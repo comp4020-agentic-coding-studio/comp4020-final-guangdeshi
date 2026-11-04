@@ -20,7 +20,7 @@ set), and a documented concurrency policy
 append-only, duplicates are retained and labelled rather than discarded, and
 the recommendation is always recomputed from the full persisted record.
 
-Verification: `pnpm check` (46 tests: typecheck + unit tests for the
+Verification: `pnpm check` (31 tests: typecheck + unit tests for the
 fixture/algorithm + HTTP-level tests against a running instance, covering
 persistence across reload, two independent participants, concurrent and
 duplicate submissions, reveal/reset, and SSE delivery), the same checks
@@ -30,18 +30,35 @@ exact findings and any caveats).
 
 ## What was the breakthrough that moved the work forward?
 
-*(Left for the student's own words — this is the part no account written on
-their behalf can honestly fill in. The implementation record above is the
-factual basis to reflect against; the breakthrough itself was a moment of
-understanding, not a line of code, and isn't something to infer or invent
-here.)*
+By Crit 9, Bug Relay worked: two people could investigate the same bug in
+real time. One important design decision was to keep evidence append-only,
+so when two people submit results at the same moment, both are kept rather
+than one overwriting the other.
+
+But building it made me question whether it was the right final product.
+The debugging workflow needed specialised knowledge, making the interaction
+meaningful took more complexity than I expected, and people without a
+programming background would struggle to use it.
+
+The breakthrough was recognising that technical complexity does not
+necessarily make a project more valuable. Instead of expanding Bug Relay, I
+started looking for a more accessible, everyday problem. After this crit,
+that led to the pivot to Buy or Pass, because almost everyone makes
+purchasing decisions and can offer opinions from their own experience.
 
 ## What did this work change about who I want to be as a software developer?
 
-*(Also left for the student. One prompt worth considering while writing it:
-this crit required naming and defending a concurrency decision — "which
-updates propagate live, how do simultaneous submissions get handled" — that
-has no single correct answer, only trade-offs weighed against this project's
-own stated Definition of Good. What did making and defending that kind of
-call, rather than a purely technical one, change about how you think about
-this work?)*
+This crit changed how I see my role with a coding agent. Claude implemented
+much of the code, including the server, schema, SSE connection and tests,
+and found the mobile overflow bug by opening the page at phone width. My
+responsibility was to make and justify the design decisions, rather than
+simply accepting the agent's implementation. These included dropping
+Pick-Up Sticks, building one case properly instead of several half-finished
+ones, keeping every experiment record, and later questioning Bug Relay
+itself. I also had to verify the results by reading the tests and checking
+the screenshots, rather than trusting that the work was done.
+
+It also showed me that finding a genuinely useful problem can be harder than
+implementing a solution. I don't think every project has to change the
+world, but I want to build software with a clear practical reason to exist,
+and I now see finding that reason as part of the work.
