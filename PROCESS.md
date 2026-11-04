@@ -77,6 +77,12 @@ outcome, authorization denials, and the live admin log. A server-restart
 test confirmed data survives restart. Live deployment against
 `comp4020-final-guangdeshi.fly.dev` is recorded once performed.
 
+It was performed by CI run 39517220946 on
+[`7a14d4d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7a14d4d)
+(the OOM fix), with both its check and deploy jobs green. On 2026-11-03 the
+live site still served that build: `/`, `/healthz` and `/readme/` answered
+200, while v2.0's `/showcase` answered 404.
+
 ## v2.0: responding to tutor feedback
 
 The tutor accepted the concept but found the response to the brief
@@ -128,3 +134,114 @@ frontend plus the two bug fixes
 verified against a freshly reset local database. Developed entirely on
 `feature/buy-or-pass-v2`; per explicit instruction for this session, not
 merged to `main` or deployed to the live Fly app.
+
+## v2.0 after its first pass: audits, a real catalog, live everything
+
+Each later change on the branch came out of looking at the running app, not
+from the plan:
+
+- A visual design audit, run on screenshots of real labelled content at
+  three viewports, found a logged-in nav 465px wide on a 390px screen and
+  demo illustrations with truncated labels
+  ([`899ca05`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/899ca05)),
+  then shaped the approved "Decision Studio" redesign
+  ([`58675e7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/58675e7)).
+  Screenshot review also caught Which One? cards always reading "No opinions
+  yet", because the card looked for stance counts a comparison post never
+  has
+  ([`d3545b3`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/d3545b3)).
+- A demo "photo" of headphones turned out to be a 100px line icon rendered
+  as a black square; it was replaced with a licensed photograph, and
+  source-linked real-world purchase discussions were added as clearly
+  separate, vote-free cards
+  ([`c511a37`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c511a37)).
+- Discover moved from fictional demos to 72 real products from Amazon
+  Berkeley Objects (CC BY 4.0) with no prices, ratings or engagement, and
+  the demos moved to a labelled `/showcase` archive
+  ([`cfb2379`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/cfb2379),
+  [`8031431`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8031431),
+  [`f04658e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/f04658e)).
+- A two-browser acceptance audit found that only votes met the brief's
+  "visible within about a second" bar: new questions, edits, outcomes,
+  influential markers and deletions all needed a reload. Every shared change
+  now broadcasts an id-only event, and each page refetches its own
+  server-rendered live regions
+  ([`8911295`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8911295);
+  contract in ADR 0005,
+  [`cdaf36f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/cdaf36f)).
+- During that audit a test run aimed at the wrong target wrote test accounts
+  into the preview database. The spec and every account-creating browser
+  script now refuse any instance that doesn't report itself disposable, and
+  `scripts/verify-realtime.mjs` keeps two browsers open across the whole
+  live-update matrix
+  ([`6214d4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/6214d4a)).
+
+The branch was merged to `main` as
+[`7ac3504`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7ac3504),
+whose message records that migrations 0003-0008 were rehearsed on a backup
+of the live database (integrity ok, no foreign-key violations, existing
+live content preserved).
+
+## v2.0 release: an image that never booted
+
+The v2.0 merge to `main` failed CI (run 41562150309) and so never deployed;
+production stayed on the pre-v2.0 build. The spec reported only "nothing is
+answering", but the container log showed the real cause: `src/server.ts`
+imports `scripts/seed-demo-content.ts` (the admin demo-seed route), and the
+Dockerfile's final stage copied only `src/`. Every local run had used the
+whole working tree, so nothing before CI ever exercised the built image.
+The Dockerfile now also copies the seeder and the licensed source photos it
+reads at runtime
+([`0345862`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/0345862)).
+With no container runtime on the development machine, the
+fix was checked against a directory holding exactly the image's file set:
+without `scripts/` it reproduced the CI crash; with it, the app booted,
+`pnpm check` passed (201 tests) against it, `scripts/verify-admin.mjs` seeded
+the demo set through a real browser, and the seeded posts and images
+survived a restart. The image itself is first built by CI.
+
+Exercising that route exposed a second, memory problem the merge would have
+shipped: the seeder re-encoded its source photos (up to 5472x3648) at full
+size, bypassing the 1600px bound real uploads get. Measured locally with
+`/usr/bin/time -l` around the server during one admin seed, peak RSS was
+~375MB; bounding the seeder to the same `OUTPUT_MAX_DIMENSION` brought it to
+~195MB, and the stored demo images from 9.6MB to 3.0MB. These are macOS
+figures, not Fly's Linux ones, and `--max-old-space-size` would not have
+caught this, since `sharp`'s decode buffers live outside the V8 heap — the
+before/after difference is the evidence, not the absolute numbers.
+
+That prompted the same measurement on the ordinary upload path, with
+worst-case-but-valid images (4096x4096, small files) posted to a fresh
+disposable server per scenario. `src/images.ts` claimed
+`sharp.concurrency(1)` made concurrent uploads queue; it only limits threads
+within one image, and a post's photos went through `Promise.all`, so they
+decoded in parallel. One post with four WebPs (1.3MB in total) took the
+server from ~135MB to ~580MB. Every decode now takes one process-wide slot
+(`src/image-slot.ts`, unit-tested in `spec/unit.test.ts`); peaks fell from
+~280MB to ~180MB for four PNGs, ~580MB to ~250MB for four WebPs, and ~620MB
+to ~260MB for three such WebP posts at once. WebP is still the most
+expensive format (~110MB above baseline for one 16-megapixel image) and was
+not traced further: its cost comes from inside libvips/libwebp, and Fly's
+Linux/musl build may behave differently. Watching the live machine's memory
+after the next deploy is the remaining check. Both memory fixes are in
+[`4e1674b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4e1674b).
+
+Verification of all three fixes together, on 2026-11-03, against a
+`pnpm dev:test` instance built from the working tree:
+
+- `pnpm typecheck` clean;
+- `pnpm test`: 203 of 203 across 20 spec files (the 201 above plus the two
+  decode-slot unit tests);
+- `pnpm check:evidence` passing;
+- in real headless Chromium:
+  - `scripts/verify-browser.mjs` passed, with live updates in 56-82ms;
+  - `scripts/verify-admin.mjs` passed, including the seed and its no-op
+    re-run;
+  - `scripts/verify-realtime.mjs` passed, at 52ms median and 86ms maximum
+    end to end over 32 samples, and 8ms maximum from commit to visible;
+  - `scripts/verify-catalog.mjs` passed.
+
+These are localhost timings, not production ones. Not yet done:
+- building the Docker image (CI is the first place that happens);
+- the trufflehog secret scans, which only run in CI;
+- measuring memory on Fly itself.

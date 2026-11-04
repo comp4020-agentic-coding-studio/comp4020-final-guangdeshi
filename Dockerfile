@@ -22,6 +22,13 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY package.json ./package.json
 COPY src/ ./src/
+# The admin "seed demo content" action (POST /admin/demo/seed) imports the
+# seeding script, and the script reads its licensed source photos at runtime,
+# so both ship in the image. Without the script the server fails to start
+# (ERR_MODULE_NOT_FOUND) — CI caught this on the v2.0 merge (run
+# 41562150309); local runs never exercised the built image.
+COPY scripts/seed-demo-content.ts ./scripts/seed-demo-content.ts
+COPY docs/assets/demo-source-images/ ./docs/assets/demo-source-images/
 COPY README.md ./README.md
 
 ENV NODE_ENV=production

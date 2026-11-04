@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword, isValidEmail, isValidHandle, isValidPassw
 import { validateOpinionInput, validatePostInput, normalizeTags, escapeHtml } from "../src/validation.ts";
 import { postCard, referenceCard } from "../src/render.ts";
 import type { Post } from "../src/db.ts";
+import { withImageSlot } from "../src/image-slot.ts";
 
 describe("password hashing", () => {
   it("hashes never equal the plaintext and verify correctly", () => {
@@ -254,5 +255,31 @@ describe("referenceCard: real-world reference rendering", () => {
   it("always renders the knownGaps text, never hiding what the source doesn't say", () => {
     const html = referenceCard(baseRef);
     expect(html).toContain("The final purchase was never confirmed.");
+  });
+});
+
+// The 256MB machine can only afford one full-size decode at a time, so the
+// upload path's Promise.all must still run its decodes one after another.
+describe("image decode slot", () => {
+  it("never runs two tasks at once, even when they are started together", async () => {
+    let running = 0;
+    let maxRunning = 0;
+    const task = async () => {
+      running += 1;
+      maxRunning = Math.max(maxRunning, running);
+      await new Promise((r) => setTimeout(r, 10));
+      running -= 1;
+    };
+    await Promise.all([1, 2, 3, 4].map(() => withImageSlot(task)));
+    expect(maxRunning).toBe(1);
+  });
+
+  it("passes a failure to its own caller without blocking the next task", async () => {
+    const failed = withImageSlot(async () => {
+      throw new Error("bad image");
+    });
+    const next = withImageSlot(async () => "ok");
+    await expect(failed).rejects.toThrow("bad image");
+    await expect(next).resolves.toBe("ok");
   });
 });

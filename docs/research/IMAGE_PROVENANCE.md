@@ -47,10 +47,11 @@ is reused, not just in this manifest (see `CC_BY_ATTRIBUTION` in
 recorded here for transparency regardless.
 
 All seven source files are re-encoded by `scripts/seed-demo-content.ts`'s
-own `storeRealImage` (same `sharp(...).rotate().jpeg()` re-encode
-discipline as `src/images.ts`'s `processAndStoreImage`, applied separately
-here since seeding runs outside the HTTP upload path), which strips any
-residual metadata and produces the actual stored JPEG, so the files
+own `storeRealImage` (same `sharp(...).rotate().resize().jpeg()` re-encode
+discipline as `src/images.ts`'s `processAndStoreImage`, bounded to the same
+`OUTPUT_MAX_DIMENSION` of 1600px, applied separately here since seeding
+runs outside the HTTP upload path), which strips any residual metadata and
+produces the actual stored JPEG, so the files
 committed under `docs/assets/demo-source-images/` are kept only as the
 original, source-of-truth copies with their licenses intact; they are not
 served directly to visitors.

@@ -13,6 +13,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { createImageRow, type ImageRow } from "./db.ts";
+import { withImageSlot } from "./image-slot.ts";
 
 // Same convention as src/db.ts's DB_PATH: defaults to a local relative path
 // (/data isn't writable without root locally); fly.toml and CI both set
@@ -23,25 +24,29 @@ mkdirSync(UPLOAD_DIR, { recursive: true });
 // This app runs on a single 256MB Fly machine (fly.toml) — sharp's default
 // concurrency (one decode thread per CPU core) is tuned for a dedicated
 // image-processing box, not a shared 256MB budget also running Node/V8 and
-// node:sqlite. Capped at 1 so concurrent uploads queue rather than each
-// spike memory simultaneously; a real production incident (an oversized
-// scrypt parameter, not this) already OOM-crashed this exact machine once
-// during Crit 10 deployment verification, so this is deliberate headroom,
-// not a guess. See docs/architecture/AUTH_AND_PERMISSIONS.md for that
-// incident's account.
+// node:sqlite. Capped at 1 to keep each decode lean; a real production
+// incident (an oversized scrypt parameter, not this) already OOM-crashed
+// this exact machine once during Crit 10 deployment verification, so this is
+// deliberate headroom, not a guess. See docs/architecture/AUTH_AND_PERMISSIONS.md
+// for that incident's account.
 sharp.concurrency(1);
+// That alone doesn't stop separate images decoding in parallel; every decode
+// also takes the process-wide slot in src/image-slot.ts.
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB raw upload cap
 const MAX_DIMENSION = 4096;
 const MIN_DIMENSION = 64;
-const OUTPUT_MAX_DIMENSION = 1600;
+export const OUTPUT_MAX_DIMENSION = 1600;
 
 export class ImageValidationError extends Error {}
 
 export async function processAndStoreImage(ownerUserId: string, buffer: Buffer): Promise<ImageRow> {
   if (buffer.length === 0) throw new ImageValidationError("empty file");
   if (buffer.length > MAX_UPLOAD_BYTES) throw new ImageValidationError("file too large");
+  return withImageSlot(() => decodeAndStore(ownerUserId, buffer));
+}
 
+async function decodeAndStore(ownerUserId: string, buffer: Buffer): Promise<ImageRow> {
   let image;
   let metadata;
   try {
