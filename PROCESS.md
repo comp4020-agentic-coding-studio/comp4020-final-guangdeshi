@@ -241,7 +241,9 @@ Verification of all three fixes together, on 2026-11-03, against a
     end to end over 32 samples, and 8ms maximum from commit to visible;
   - `scripts/verify-catalog.mjs` passed.
 
-These are localhost timings, not production ones. Not yet done:
-- building the Docker image (CI is the first place that happens);
-- the trufflehog secret scans, which only run in CI;
-- measuring memory on Fly itself.
+These are localhost timings, not production ones. The fix merge
+([`611c9b6`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/611c9b6))
+then passed CI (image build, spec, secret scans; run 41767349260) and
+deployed as Fly release v8. Live checks with two browsers found updates
+visible in 96-179ms, a server RSS of ~105MB (peak ~118MB), and data intact
+across a machine restart.

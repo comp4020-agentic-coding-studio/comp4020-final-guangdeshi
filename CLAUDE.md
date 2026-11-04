@@ -366,11 +366,9 @@ STAGE:     Buy or Pass v2.0 — a response to tutor feedback that the original
            PROCESS.md for the full record. Later work on the branch added a
            real product catalog, /showcase, and live updates for every
            shared change (ADR 0005).
-RELEASE:   v2.0 was merged to origin/main (7ac3504), but CI failed because
-           the image crashed on boot, so it never deployed. The live Fly app
-           still runs the pre-v2 build (7a14d4d). The fixes (image packaging
-           0345862, image-decode memory 4e1674b) are on
-           feature/buy-or-pass-v2 and not yet pushed. Releasing them means a
-           push to main, which auto-deploys and runs migrations 0003-0008 on
-           the live database, so it needs the student's explicit approval.
+RELEASE:   Deployed. The first v2.0 merge (7ac3504) failed CI because the
+           image crashed on boot; the fix merge 611c9b6 passed CI and
+           deployed as Fly release v8 on 2026-11-04. Migrations 0003-0008 ran
+           on the live database, and its existing rows, uploads and the old
+           bug-relay.db / sticks.db files were kept (backup taken first).
 ```
