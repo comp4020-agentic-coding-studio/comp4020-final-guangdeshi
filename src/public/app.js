@@ -707,6 +707,46 @@ function initCompareTray() {
   render();
 }
 
+/**
+ * One submission per click. On a slow connection a second click (or a
+ * double-click) on "Publish post" used to send a second, identical request,
+ * creating a duplicate post (reproduced under Chrome's Fast 3G and Slow 3G
+ * throttling; opinions were already safe through their UNIQUE constraint).
+ * After the first submit, further submits of the same form are ignored and
+ * the button says what is happening. The lock is lifted whenever the page is
+ * shown again (back/forward cache), so a failed or abandoned submit never
+ * leaves a button permanently disabled. Server-side validation is unchanged.
+ */
+function initSubmitOnce() {
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || (form.method || "get").toLowerCase() !== "post") return;
+    if (form.dataset.submitting === "true") {
+      event.preventDefault();
+      return;
+    }
+    form.dataset.submitting = "true";
+    const button = event.submitter ?? form.querySelector('button[type="submit"]');
+    if (button) {
+      button.dataset.idleLabel = button.textContent;
+      button.setAttribute("aria-disabled", "true");
+      button.classList.add("is-submitting");
+      if (form.classList.contains("post-form")) button.textContent = "Publishing…";
+    }
+  });
+  window.addEventListener("pageshow", () => {
+    document.querySelectorAll('form[data-submitting="true"]').forEach((form) => {
+      delete form.dataset.submitting;
+      form.querySelectorAll(".is-submitting").forEach((button) => {
+        button.classList.remove("is-submitting");
+        button.removeAttribute("aria-disabled");
+        if (button.dataset.idleLabel) button.textContent = button.dataset.idleLabel;
+      });
+    });
+  });
+}
+
+initSubmitOnce();
 initPostDetail();
 initLiveFeed();
 initCompareTray();

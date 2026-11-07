@@ -380,6 +380,26 @@ const dbHtml = await (await fetch(postUrl)).text();
 check("12.concurrent-all-accepted", statusesConc.every((s) => s === 200), JSON.stringify(statusesConc));
 check("12.live-counts-match-database", liveOk && dbHtml.includes("👍 4 Buy") && dbHtml.includes("👎 3 Pass"), "A (live) and a fresh server render both show 4 Buy / 3 Pass, 7 rows");
 
+// --------------------------------------------------------------- TEST 13
+// A double-click on "Publish post" over a slow link must create one post,
+// not two (regression: reproduced under Chrome's Slow 3G profile before
+// initSubmitOnce in app.js). Throttling is real CDP network emulation.
+{
+  const cdp = await ctxA.newCDPSession(A);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 400, downloadThroughput: 51200, uploadThroughput: 51200 });
+  const dupTitle = `RT double submit ${Date.now()}`;
+  await A.goto(`${BASE}/posts/new?product=abo-b07pdyw6vm`, { timeout: 60000 });
+  await A.fill('input[name="title"]', dupTitle);
+  await A.fill('textarea[name="description"]', "double submit probe");
+  await A.locator("form.post-form button[type=submit]").dblclick({ delay: 80 });
+  await A.waitForURL(/\/posts\/[a-f0-9-]{36}$/, { timeout: 60000 });
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+  const html = await (await fetch(`${BASE}/discover?view=questions`)).text();
+  const n = html.split(dupTitle).length - 1;
+  check("13.double-click-publish-creates-one-post (Slow 3G)", n === 1, `${n} card(s) with that title`);
+}
+
 // --------------------------------------------------------------- TEST 11
 for (const [path, name] of [["/discover", "products"], ["/discover?view=questions", "questions"], [new URL(postUrl).pathname, "post"], [new URL(cmpUrl).pathname, "comparison"], ["/products/abo-b07pdyw6vm", "product"]]) {
   await B.goto(`${BASE}${path}`);
