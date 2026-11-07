@@ -55,17 +55,27 @@ under budget. Full account in `PROCESS.md`, "A real production incident."
 
 ## What was the breakthrough that moved the work forward?
 
-*(Left for the student's own words — this is the part no account written on
-their behalf can honestly fill in. The implementation record above is the
-factual basis to reflect against; the breakthrough itself was a moment of
-understanding, not a line of code, and isn't something to infer or invent
-here.)*
+*These two answers were written on 8 November 2026, after the Crit 10
+cutoff. The factual account above is from 21 October 2026 (commits 719deed
+and 7a14d4d).*
+
+The Bug Relay idea was hard to turn into a website that was useful and easy
+to operate. The breakthrough was recognising that problem and moving to Buy
+or Pass instead, where people take part through their own real purchasing
+experiences rather than a fixed debugging setup. I also built and checked
+the new product separately before moving it into this repository. That
+lowered the risk of damaging the existing project, its history and the data
+already on the Fly volume.
 
 ## What did this work change about who I want to be as a software developer?
 
-*(Also left for the student. One prompt worth considering while writing it:
-this crit required a second product pivot in three weeks, and a decision to
-build and verify the new product entirely outside this repository before
-bringing it in — both judgement calls about risk and process, not purely
-technical ones. What did making that kind of call, rather than a feature
-decision, change about how you think about this work?)*
+I realised that getting an agent to implement features is different from
+building something people can actually use. I need to be clearer about the
+interaction I want, test the website myself, and check what it actually
+does instead of relying on the agent's report that it is finished.
+
+The production memory failure right after this crit made the same point
+from another direction. The password-hashing settings were fine on my
+laptop but crashed the 256MB production machine on every boot. Real
+conditions matter, and something only counts as working once it works
+there.
