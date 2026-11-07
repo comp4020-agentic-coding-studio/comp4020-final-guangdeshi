@@ -86,6 +86,10 @@ Added with v2.0 and the catalog:
 - `discover-references.test.ts` — external references stay separate and
   vote-free.
 - `admin-bootstrap.test.ts` — first-admin provisioning fails closed.
+- `buyer-decides.test.ts` — a majority vote never becomes an outcome; the
+  buyer can decide against it and the counts stay as they were.
+- `submit-once.test.ts` — a POST form submits once, so a slow double-click
+  can't create a duplicate post (runs the real `app.js` in jsdom).
 
 `docs/evidence/GOOD_TO_EVIDENCE.md` maps these to the README's Definition
 of Good.

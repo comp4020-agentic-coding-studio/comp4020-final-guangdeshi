@@ -367,7 +367,7 @@ preview database with test accounts, fixed in
 
 ## Current project state
 
-Snapshot, checked 2026-11-07. Re-check it before relying on it (section 1).
+Snapshot, checked 2026-11-08. Re-check it before relying on it (section 1).
 
 ```
 PRODUCT:  Buy or Pass. A buyer posts a purchase they're considering, with
@@ -377,12 +377,9 @@ PRODUCT:  Buy or Pass. A buyer posts a purchase they're considering, with
           labelled demos live in /showcase.
 STACK:    Node 24 with type-stripping (no build step), node:sqlite with
           FTS5, Server-Sent Events, sharp + busboy. Rationale in PROCESS.md.
-LIVE:     Fly release v8 (2026-11-04) serves main at 611c9b6; one
-          shared-cpu-1x 256MB machine, one volume. Deploys go through CI on
-          push to main.
-BRANCH:   feature/buy-or-pass-v2 is ahead of main with reflection and
-          documentation commits only; nothing on it is deployed.
-OPEN:     research-note.md not yet written; crit-10 reflection answers
-          left for the student; no human evaluation run
+LIVE:     One shared-cpu-1x 256MB Fly machine, one volume. Deploys go
+          through CI on push to main; check `flyctl releases` for the
+          current release.
+OPEN:     research-note.md not yet written; no human evaluation run
           (docs/product/HUMAN_EVALUATION_PROTOCOL.md is prepared only).
 ```
