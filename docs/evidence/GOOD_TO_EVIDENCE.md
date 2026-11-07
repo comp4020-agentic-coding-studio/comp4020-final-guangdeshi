@@ -7,110 +7,118 @@ The README's Definition of Good is one sentence:
 
 That sentence dates from the Buy or Pass pivot
 ([`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed), 2026-10-21).
-It came with eight implications, which were rewritten into the current six
-bullets in v2.0
+It came with eight implications, which were rewritten in v2.0
 ([`b903ee0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/b903ee0)).
 
-This record sorts the shipped product into six analytical dimensions. They
-were drawn up on 2026-11-07 to audit the final version. They are not the
-original list.
+The six dimensions below are a later reading of that sentence for the app as
+it exists. They were drawn up on 2026-11-07 and are not the original list.
+The README uses the same six.
 
-For each dimension it gives:
+For each one, evidence is split four ways:
 
-- **Implementation:** where the dimension is built.
-- **Rule:** the `CLAUDE.md` rule that governs it.
-- **Evidence:** the check that exercises it, marked **enforced** (an automated
-  check fails if it breaks) or **judged** (only a person can assess it).
-- **Commits:** where it landed.
-- **Limits:** what remains open.
-
-The spec runs against a disposable instance (`pnpm dev:test`). Browser scripts
-are run by hand against one.
+- **Tested:** an automated check in `spec/` fails if the claim breaks. The
+  spec runs against a disposable instance (`pnpm dev:test`).
+- **Browser:** exercised in real Chrome or Chromium by a `scripts/verify-*.mjs`
+  script, run by hand against a disposable instance.
+- **Human judgement:** a claim only a person can assess.
+- **Not yet evaluated:** that judgement has not been made with real users.
 
 ## 1. Relevant human context
 
 - **Implementation:**
-  - A required description of at most 2000 characters (`src/validation.ts`).
+  - A required description (`src/validation.ts`).
   - Up to three optional category prompts plus free text
-    (`src/context-prompts.ts`, ADR 0004).
-  - A context card that shows only answered prompts (`contextCard` in
-    `src/render.ts`).
-- **Rule:** 25.
-- **Evidence (enforced):**
-  - `spec/context.test.ts` checks that unanswered prompts render nothing and
-    that foreign keys are dropped.
-  - `spec/unit.test.ts` checks the post validation.
+    (`src/context-prompts.ts`, ADR 0004). Five of ten categories share the
+    generic prompts.
+  - `contextCard` (`src/render.ts`) shows only answered prompts.
+- **Rule:** `CLAUDE.md` section 25.
+- **Tested:** `spec/context.test.ts` (unanswered prompts render nothing,
+  foreign keys are dropped, and edits persist); `spec/unit.test.ts` (post
+  validation).
+- **Browser:** `verify-realtime` edits a post's context and checks that it
+  reaches a second open browser.
+- **Human judgement:** whether context makes advice more relevant.
+- **Not yet evaluated:** no user study.
+  `docs/product/HUMAN_EVALUATION_PROTOCOL.md` is prepared only.
 - **Commits:** [`c865244`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c865244),
   [`a5a62b7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a5a62b7).
-- **Limits (judged, untested):**
-  - Whether context makes advice more relevant has not been tested.
-    `docs/product/HUMAN_EVALUATION_PROTOCOL.md` is prepared but not conducted.
-  - Five categories share the generic prompts.
 
 ## 2. Low-friction participation
 
 - **Implementation:**
   - An opinion is one stance (or one option) plus one comment of at most
     500 characters.
-  - There is no wizard and no questionnaire.
-  - Double-submission is guarded client-side. This is uncommitted at the time
-    of writing.
+  - There is no wizard.
+  - Each POST form submits once, so a slow double-click can't duplicate a
+    post.
 - **Rules:** 13, 15.
-- **Evidence:**
-  - Enforced: `spec/posts-and-opinions.test.ts` (stance and comment rules),
-    `spec/realtime-contract.test.ts` (validation).
-  - Judged: whether one sentence is "easy". There is no timing or usability
-    study.
-- **Commits:** [`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed).
-- **Limits:**
-  - The create-post form shows 12–15 inputs, and a photo is required unless
-    the post is catalog-linked.
-  - A comment is required, so there is no vote-only path.
+- **Tested:**
+  - `spec/posts-and-opinions.test.ts` (stance and comment rules).
+  - `spec/realtime-contract.test.ts` (validation).
+  - `spec/submit-once.test.ts` (the submit guard, in jsdom).
+- **Browser:**
+  - `verify-browser` posts and changes an opinion across two browsers.
+  - `verify-realtime` TEST 13 double-clicks "Publish post" under Slow 3G and
+    finds one post.
+- **Human judgement:** whether one stance and one sentence is easy enough.
+- **Not yet evaluated.** Known friction stays:
+  - the create-post form shows 12–15 inputs;
+  - a photo is required unless the post is catalog-linked;
+  - there is no vote-only path.
+- **Commits:** [`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed),
+  [`9016912`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/9016912).
 
 ## 3. Honest information and provenance
 
 - **Implementation:**
-  - Counts are live `COUNT` queries, never stored.
-  - Demo rows carry `is_demo = 1`, are excluded from every real aggregate, and
-    sit behind a banner in `/showcase`.
-  - Catalog products are facts only: no price, rating or engagement.
-  - Image and reference provenance is in `docs/research/`.
+  - Counts are live `COUNT` queries.
+  - Demo rows carry `is_demo = 1`, are kept out of real aggregates, and are
+    bannered in `/showcase`.
+  - Catalog products carry facts and sources, never prices, ratings or
+    engagement.
+  - Provenance is recorded in `docs/research/`.
 - **Rules:** 16, 24, 26, 28.
-- **Evidence (enforced):**
-  - `spec/discover-sources.test.ts`, `spec/demo.test.ts`,
-    `spec/catalog.test.ts` ("never stores a price, rating…"),
-    `spec/catalog-http.test.ts`.
-  - The `postCard` "No opinions yet" tests in `spec/unit.test.ts`.
-  - `spec/discover-references.test.ts`.
+- **Tested:**
+  - `spec/discover-sources.test.ts`, `spec/demo.test.ts`.
+  - `spec/catalog.test.ts` ("never stores a price, rating…").
+  - `spec/catalog-http.test.ts`, `spec/discover-references.test.ts`.
+  - The "No opinions yet" tests in `spec/unit.test.ts`.
+- **Browser:** `verify-catalog`; `verify-realtime` TEST 8 (no demo or admin
+  content in the live feed).
+- **Human judgement:** whether the labels are clear to a visitor.
+- **Not yet evaluated:** opinions themselves are unverified claims. A
+  headphones "photo" that was really a 100px icon was found only by looking
+  at a screenshot
+  ([`c511a37`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c511a37)).
 - **Commits:** [`c865244`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c865244),
-  [`c511a37`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c511a37),
   [`cfb2379`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/cfb2379),
   [`f04658e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/f04658e).
-- **Limits:**
-  - Opinions themselves are unverified claims. Nothing checks whether a
-    commenter has owned the product.
-  - A headphones "photo" that was really a 100px icon was found only by
-    looking at a screenshot.
 
 ## 4. Buyer agency
 
 - **Implementation:**
-  - No verdict field or endpoint exists.
-  - An author cannot opine on their own post (403).
+  - Votes are never turned into a decision.
+  - An author cannot opine on their own post.
   - Only the author records Bought / Didn't buy / Still deciding.
-  - An optional influential marker is owner-only and same-post, and never
-    changes counts.
+  - The influential marker is owner-only, same-post and count-neutral.
 - **Rules:** 14, 27.
-- **Evidence (enforced):**
-  - `spec/posts-and-opinions.test.ts` (TEST K, the self-vote 403).
-  - `spec/influential-opinion.test.ts`.
-  - `spec/comparison.test.ts` (no self-vote).
+- **Tested:**
+  - `spec/buyer-decides.test.ts`. A 3-to-1 vote leaves no outcome. The buyer
+    can record the opposite of a unanimous vote, with the counts unchanged. A
+    comparison option with every vote is not shown as bought. A mutation that
+    showed "Bought it" whenever Buy led made the first test fail.
+  - `spec/posts-and-opinions.test.ts` (TEST K and the self-vote 403).
+  - `spec/influential-opinion.test.ts`, `spec/comparison.test.ts`.
+- **Browser:**
+  - `verify-browser` TEST I: the author records an outcome, and the other
+    browser sees the read-only badge.
+  - `verify-realtime`: influential mark and unmark, live.
+- **Human judgement:** whether buyers feel the decision stays theirs, and
+  whether the opinions help them decide with less uncertainty.
+- **Not yet evaluated.**
 - **Commits:** [`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed),
-  [`c865244`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c865244).
-- **Limits:**
-  - "No verdict exists" is shown by the absence of a field, not by a test that
-    scans for one.
-  - Whether buyers feel ownership of the decision is judged.
+  [`c865244`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c865244),
+  [`60fab79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/60fab79).
 
 ## 5. Real-time co-presence
 
@@ -119,50 +127,49 @@ are run by hand against one.
   - Events carry ids only. Pages refetch their own server-rendered
     `[data-live-region]`s (ADR 0005).
 - **Rule:** 29.
-- **Evidence:**
-  - Enforced: `spec/realtime-contract.test.ts` and `spec/realtime.test.ts`.
-  - Run by hand: `scripts/verify-realtime.mjs`, with two browsers at
-    1440×900 and 390×844. It covers every shared change, offline and
-    reconnect, six concurrent voters, and Slow 3G.
+- **Tested:** `spec/realtime-contract.test.ts`, `spec/realtime.test.ts`.
+- **Browser:** `verify-realtime` keeps two browsers open across every shared
+  change, offline and reconnect, six concurrent voters, and Slow 3G. On
+  2026-11-08 it ran with `DESKTOP=1920x1080` beside 390×844, the two marking
+  viewports: 64 of 64 checks passed, with end-to-end latency at a median of
+  55ms and a maximum of 84ms (localhost)
+  ([`8d8f744`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8d8f744)).
+- **Production:** after release v8, one two-browser session saw updates in
+  96–179ms. This was not a load test.
+- **Human judgement:** whether co-presence feels social. Not evaluated.
 - **Commits:** [`8911295`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8911295),
   [`6214d4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/6214d4a),
   [`cdaf36f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/cdaf36f).
-- **Limits:**
-  - The 2026-11-03 audit found that, before `8911295`, only votes were live.
-  - Production timings (96–179ms) come from one two-browser session after
-    release v8. They are not a load test.
 
 ## 6. Reliability and accountability
 
 - **Implementation:**
   - `UNIQUE(post_id, user_id)` with a single-statement upsert.
   - Session-derived identity and inline ownership checks.
-  - Logs that carry identifiers only.
-  - A process-wide image-decode slot and memory-sized scrypt for the 256MB
-    machine.
+  - Logs carry identifiers, never content.
+  - A process-wide image-decode slot, and scrypt sized for the 256MB machine.
   - Tests refuse non-disposable targets.
 - **Rules:** 14, 15, 17, 18, 22, 30.
-- **Evidence:**
-  - Enforced:
-    - `spec/posts-and-opinions.test.ts` (concurrent submissions collapse to
-      one row).
-    - `spec/auth.test.ts`.
-    - `spec/uploads.test.ts`.
-    - `spec/unit.test.ts` (the scrypt memory ceiling and the decode slot).
-    - `spec/global-setup.ts` and `/healthz/test-target`.
-  - Run by hand: `scripts/verify-admin.mjs`.
+- **Tested:**
+  - `spec/posts-and-opinions.test.ts` (concurrent submits collapse to one
+    row).
+  - `spec/auth.test.ts`, `spec/uploads.test.ts`.
+  - `spec/unit.test.ts` (scrypt memory ceiling, decode slot).
+  - `spec/global-setup.ts` (the disposable-target guard).
+- **Browser:** `verify-admin` (live admin log, non-admin 403).
+- **Not yet evaluated:**
+  - Memory was measured on macOS, not on Fly's Linux machine.
+  - The image is first built in CI (there is no local container runtime).
+  - The C10 log rehearsal used two automated profiles. It was not a
+    classroom demonstration.
 - **Commits:** [`7a14d4d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7a14d4d),
   [`6214d4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/6214d4a),
   [`0345862`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/0345862),
   [`4e1674b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4e1674b).
-- **Limits:**
-  - Memory figures were measured on macOS, not on Fly's Linux machine.
-  - There is no container runtime locally, so the image is first built in CI.
-  - The C10 log rehearsal was automated (two headless profiles). It was not a
-    classroom demonstration.
 
 ## Not claimed
 
-No human user study has been run. The scripted personas in the 2026-11-05 UX
-experiment (kept outside the repo) are functional checks, not user research.
-Every "judged" item above is still open.
+No human user study has been run, so nothing here shows that Buy or Pass has
+improved anyone's purchasing decision. The scripted personas in the
+2026-11-05 UX experiment (kept outside the repo) are functional checks, not
+user research.
