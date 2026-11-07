@@ -6,10 +6,10 @@
 **The purchase belongs to the buyer. The opinions belong to the community.**
 
 This is the single sentence every design and engineering decision in this
-repository traces back to. See `README.md` for the full elaboration into
-eight concrete implications (low friction, clear position, human context,
-accountability, buyer agency, real-time social value, honest results,
-relevance without gatekeeping).
+repository traces back to. The eight implications below are the original
+list from the Buy or Pass pivot (719deed); the README now groups them
+differently, and `docs/evidence/GOOD_TO_EVIDENCE.md` is the current
+claim-to-evidence trace.
 
 ## How each implication is actually enforced, not just claimed
 
@@ -49,8 +49,8 @@ review — which this product is explicitly not.
 
 - **Relevance vs. gatekeeping.** A tempting design would require some
   "expertise" signal before letting a user opine on, say, a specialist
-  computing purchase. This was deliberately rejected: README's point H is
-  explicit that lacking a badge must never block giving an opinion. Interest
+  computing purchase. This was deliberately rejected: the original Definition
+  of Good was explicit that lacking a badge must never block giving an opinion. Interest
   categories only ever affect which posts are *surfaced* to a user by
   default, never who may respond.
 - **Real-time vs. simplicity of the stack.** SSE (not WebSockets) was chosen

@@ -68,6 +68,28 @@ fully recoverable from git history and the `crit-8` tag. In their place:
   return path for "Ask about this product" (including open-redirect
   rejection), and opinion validation reached by an eligible non-owner.
 
+Added with v2.0 and the catalog:
+
+- `comparison.test.ts` — Which One? posts: 2–4 options, one selection per
+  user, mode-shape rejection in both directions, options from other posts.
+- `context.test.ts` — only answered prompts render; foreign keys dropped.
+- `influential-opinion.test.ts` — owner-only, same-post, count-neutral,
+  cleared when the opinion is deleted.
+- `history-search.test.ts` — keyword search over past decisions, never
+  surfacing unlisted or deleted posts.
+- `demo.test.ts`, `discover-sources.test.ts` — demo seeding is admin-only,
+  and demo posts never mix into real feeds or rankings.
+- `discover-sorting.test.ts` — most-discussed ordering on an isolated
+  database.
+- `catalog.test.ts`, `catalog-http.test.ts` — the catalog import, and that
+  products carry no price, rating or engagement.
+- `discover-references.test.ts` — external references stay separate and
+  vote-free.
+- `admin-bootstrap.test.ts` — first-admin provisioning fails closed.
+
+`docs/evidence/GOOD_TO_EVIDENCE.md` maps these to the README's Definition
+of Good.
+
 The spec only runs against a disposable instance: `global-setup.ts` asks
 `/healthz/test-target`, and the server says yes only with
 `BOP_DISPOSABLE_DB=1`, never on Fly and never for the preview database. Use
