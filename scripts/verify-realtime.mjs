@@ -18,6 +18,7 @@
 // Creates accounts and posts, so it only runs against a disposable server:
 //   PORT=8091 BOP_DISPOSABLE_DB=1 RATE_LIMIT_SCALE=1000 DATABASE_PATH=/tmp/rt/db.sqlite UPLOAD_DIR=/tmp/rt/up node src/server.ts
 //   APP_URL=http://localhost:8091 node scripts/verify-realtime.mjs
+// DESKTOP=1920x1080 runs A at the marking desktop viewport (default 1440x900).
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
@@ -28,6 +29,7 @@ await requireDisposableTarget(BASE);
 const ROUNDS = Number(process.env.ROUNDS ?? 3);
 const TEST_PNG = await sharp({ create: { width: 400, height: 300, channels: 3, background: { r: 60, g: 110, b: 170 } } }).png().toBuffer();
 const LIMIT_MS = 1000;
+const [DESKTOP_W, DESKTOP_H] = (process.env.DESKTOP ?? "1440x900").split("x").map(Number);
 const OUT = process.env.SCREENSHOT_DIR ?? "screenshots/realtime";
 mkdirSync(OUT, { recursive: true });
 
@@ -116,7 +118,7 @@ async function noOverflow(page) {
 }
 
 const browser = await chromium.launch();
-const ctxA = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctxA = await browser.newContext({ viewport: { width: DESKTOP_W, height: DESKTOP_H } });
 const ctxB = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 // Records each SSE event's server timestamp in the page (for commit→visible).
 const recordEvents = () => {
@@ -142,7 +144,7 @@ const A = await ctxA.newPage();
 const B = await ctxB.newPage();
 const hA = await register(A, "rtalice");
 const hB = await register(B, "rtbob");
-console.log(`[verify-realtime] A=@${hA} (1440x900), B=@${hB} (390x844); both windows stay open`);
+console.log(`[verify-realtime] A=@${hA} (${DESKTOP_W}x${DESKTOP_H}), B=@${hB} (390x844); both windows stay open`);
 
 async function waitLive(page) {
   await page.waitForFunction(
@@ -379,6 +381,26 @@ try {
 const dbHtml = await (await fetch(postUrl)).text();
 check("12.concurrent-all-accepted", statusesConc.every((s) => s === 200), JSON.stringify(statusesConc));
 check("12.live-counts-match-database", liveOk && dbHtml.includes("👍 4 Buy") && dbHtml.includes("👎 3 Pass"), "A (live) and a fresh server render both show 4 Buy / 3 Pass, 7 rows");
+
+// --------------------------------------------------------------- TEST 13
+// A double-click on "Publish post" over a slow link must create one post,
+// not two (regression: reproduced under Chrome's Slow 3G profile before
+// initSubmitOnce in app.js). Throttling is real CDP network emulation.
+{
+  const cdp = await ctxA.newCDPSession(A);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 400, downloadThroughput: 51200, uploadThroughput: 51200 });
+  const dupTitle = `RT double submit ${Date.now()}`;
+  await A.goto(`${BASE}/posts/new?product=abo-b07pdyw6vm`, { timeout: 60000 });
+  await A.fill('input[name="title"]', dupTitle);
+  await A.fill('textarea[name="description"]', "double submit probe");
+  await A.locator("form.post-form button[type=submit]").dblclick({ delay: 80 });
+  await A.waitForURL(/\/posts\/[a-f0-9-]{36}$/, { timeout: 60000 });
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+  const html = await (await fetch(`${BASE}/discover?view=questions`)).text();
+  const n = html.split(dupTitle).length - 1;
+  check("13.double-click-publish-creates-one-post (Slow 3G)", n === 1, `${n} card(s) with that title`);
+}
 
 // --------------------------------------------------------------- TEST 11
 for (const [path, name] of [["/discover", "products"], ["/discover?view=questions", "questions"], [new URL(postUrl).pathname, "post"], [new URL(cmpUrl).pathname, "comparison"], ["/products/abo-b07pdyw6vm", "product"]]) {

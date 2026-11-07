@@ -1,247 +1,255 @@
-# Process overview
+# Process
 
-## What this project is, and how it got here
+This describes the project as it stands. The complete earlier account,
+including every incident, is kept in
+[`docs/evidence/PROCESS_LOG.md`](docs/evidence/PROCESS_LOG.md).
 
-This repository has carried three products: Pick-Up Sticks (Crit 8), Bug
-Relay (Crit 9), and Buy or Pass (Final Project) — a social shopping-opinion
-platform where a user posts a purchase they're considering and other
-logged-in users give an explicit 👍 Buy / 👎 Pass opinion with a short
-comment, while the author decides independently. Each pivot is a deliberate,
-recorded decision: Crit 8 → 9 in `docs/adr/0001-concurrent-investigation-
-evidence.md`; Crit 9 → Final in `docs/adr/0002-pivot-bug-relay-to-buy-or-
-pass.md`. What carried forward across all three: git history, the Fly.io
-app and volume, and the plain-Node/`node:sqlite`/no-build-step stack from
-Crit 8. What didn't: the product code itself, each time.
+## From brief to product
 
-## Why Buy or Pass was built as an isolated prototype first
+The repository carried three products:
 
-Buy or Pass was built and fully verified as a separate project — its own
-git repository, never sharing a working directory or Fly deployment with
-this repo — before any file here was touched. This repo's `CLAUDE.md`
-(section 5) requires actually exercising a feature before calling it done,
-and iterating directly here would mean either a slow feedback loop or
-skipping verification to avoid it. The prototype let the full feature set
-be built, broken, and fixed freely before migration.
+- Pick-Up Sticks (Crit 8);
+- Bug Relay (Crit 9, [ADR 0001](docs/adr/0001-concurrent-investigation-evidence.md));
+- Buy or Pass ([ADR 0002](docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md),
+  [`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed)).
+
+Buy or Pass was built and verified as a separate prototype first. Before
+migrating it, the old `HEAD` was recorded, a backup branch was pushed, and a
+git bundle was made and restore-tested.
+
+The tutor accepted the concept but called the response to the brief
+underdeveloped. v2.0 answered with five additions:
+
+- bounded category context;
+- a "Which One?" comparison;
+- keyword search over past decisions;
+- labelled demo content;
+- an optional "influenced my decision" marker.
+
+They landed in
+[`c865244`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c865244),
+[`a5a62b7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a5a62b7) and
+[`5492bf0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/5492bf0);
+see [`TUTOR_FEEDBACK_RESPONSE.md`](docs/product/TUTOR_FEEDBACK_RESPONSE.md).
+
+Why I moved away from Bug Relay: the idea was to let developers reproduce
+bugs and help each other work out what went wrong. I still think that is
+useful, but real bugs depend a lot on each person's development
+environment, and it is hard to recreate all those situations on one
+website. Bug Relay had one fixed checkout bug. Its reproduction flow was
+also awkward to use, even though the features were implemented. With coding
+agents becoming more common, I also started to question how much extra value
+a site like that would add. That was my concern about the product, not a
+measured trend.
+
+Buying decisions are something many more people can relate to. People can
+give an opinion from their own experience, without a particular setup or
+specialist knowledge. That is why I moved to Buy or Pass rather than keep
+refining Bug Relay.
 
 ## Stack
 
-TypeScript on Node 24, type-stripping (no build step), `node:sqlite` for
-persistence (including FTS5 full-text search, added in v2.0), Server-Sent
-Events for real-time sync — every live event here is server→client only,
-so WebSockets would add protocol complexity this product doesn't need.
-`sharp` (image decoding/re-encoding/metadata stripping) and `busboy`
-(multipart parsing) are the only two npm dependencies, new in the Bug
-Relay → Buy or Pass pivot since Bug Relay had no file uploads.
+- **Plain Node 24, type-stripped TypeScript, no build step.** Carried from
+  Crit 8.
+- **`node:sqlite`.** One machine with one volume is the fixed deployment, so
+  an embedded database fits. Synchronous access also makes the
+  single-statement opinion upsert race-free in one process
+  ([DATA_MODEL](docs/architecture/DATA_MODEL.md)).
+- **Server-Sent Events, not WebSockets.** Every live event is
+  server-to-client, and the client already posts forms.
+- **`sharp` and `busboy`.** These are the only runtime dependencies, added
+  for verified image upload.
 
-## Migration and history protection
+The trade-off: the 256MB production machine, not the development laptop,
+sets the limits. That became a major constraint (see "What failed").
 
-The prototype's `src/`, its `spec/*.test.ts` files, and its `docs/`
-subtrees moved in; `fly.toml` gained `DATABASE_PATH`/`UPLOAD_DIR` entries
-so Bug Relay's existing `/data/bug-relay.db` is never read or overwritten.
-Before any file was changed: the original `HEAD`
-(`de6309b3eabd748abb72c74ea5327ab983965548`) was recorded, a backup branch
-was pushed to origin, a full `git bundle --all` backup was made and
-restore-tested, and the one pre-existing uncommitted change —
-`reflections/crit-9.md` — was confirmed untouched in the working tree. The
-migration commit is
-[`719deed`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/719deed).
+These choices were carried over from Crit 8, whose README already cited
+small-web writing
+([`f89a449`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/f89a449)). Reading Satyal and Hoyt again for the final README helped me
+evaluate the choices afterwards; I don't claim the articles caused them.
 
-## C10 ("Fly by instruments")
+I agree that a website doesn't have to become a large platform to be
+useful. It can focus on one problem and do that well. For Buy or Pass I care
+more about people getting useful, honest opinions than about the site
+looking busy. That is the part of Satyal's argument that fits, and why there
+is no fake engagement, no invented rating and no algorithm telling people
+what to buy. Hoyt's case for simple software matches the technical approach
+above.
 
-Server-side authorization is checked inline in each mutating route
-handler, deriving identity only from the session cookie. Structured
-activity logs (`src/logger.ts`) write one line per action to stdout and an
-`activity_events` table — never passwords, tokens, full emails, or
-free-text content. A protected `/admin` page streams this live over SSE.
-First-admin provisioning is a secret-gated, self-disabling route; no
-credential is baked into the app.
+But I don't think small or simple automatically makes a website good. If
+people are going to use it, it still needs proper accounts, data that
+persists, and reliable real-time updates. Sloan's home-cooked app is an
+interesting argument, but it is built for a few family members. Buy or Pass
+depends on a community of strangers, so it needs accounts, server-side
+permission checks and moderation tools that a family app can skip.
 
-## A real production incident
+## Workflow and harness
 
-The first deploy after migration crash-looped: `src/auth.ts`'s scrypt
-parameters (`N=131072`, OWASP's dedicated-auth-server tier, unexamined
-from the prototype) cost ~128MB per hash call on a 256MB machine, computed
-once at module load on *every boot*. Fixed by lowering to `N=16384`
-(~16MB/call), verified with `--max-old-space-size=180` and a real image
-upload staying under budget — not assumed safe from the number alone.
-Two smaller CI gaps (`RATE_LIMIT_SCALE`, a longer `vitest` timeout) were
-likewise caught by actually running `pnpm check`, not by trusting the
-prototype's own passing tests.
+Development uses one coding agent, held to [`CLAUDE.md`](CLAUDE.md):
 
-## Verification (pre-v2.0)
+- **Sections 1–12** are process rules carried from Crit 7
+  ([`4183f5b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4183f5b)):
+  - audit before acting;
+  - a decision boundary;
+  - verification before acceptance;
+  - commit discipline.
+- **Sections 13–30** are product constraints. Each points to an ADR or a
+  test rather than restating it.
 
-`pnpm check` passes locally and in CI. Real-browser verification
-(`scripts/verify-browser.mjs`, `scripts/verify-admin.mjs`) covers
-registration, an opinion appearing live without a reload, a purchase
-outcome, authorization denials, and the live admin log. A server-restart
-test confirmed data survives restart. Live deployment against
-`comp4020-final-guangdeshi.fly.dev` is recorded once performed.
+The agent proposes and implements. Product-value decisions and every push,
+merge or deploy wait for the developer. v2.0 was developed on `feature/buy-or-pass-v2`,
+and reached `main` in two merge commits.
 
-It was performed by CI run 39517220946 on
-[`7a14d4d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7a14d4d)
-(the OOM fix), with both its check and deploy jobs green. On 2026-11-03 the
-live site still served that build: `/`, `/healthz` and `/readme/` answered
-200, while v2.0's `/showcase` answered 404.
+I kept using Claude Code with the existing `CLAUDE.md` because the project
+kept changing, and I wanted the important rules and decisions in one place.
+Without written rules I would have to explain the same things again and
+again, and the agent could miss something important. The same file has
+carried forward since Crit 8 (and before that from Crit 7), through two
+product changes.
 
-## v2.0: responding to tutor feedback
+I did not run a proper comparison between a single agent and a multi-agent
+setup, so I don't claim one is better. Multiple agents might help, but they
+would add coordination and complexity, and keeping the existing workflow was
+a reasonable choice for this project. I also wanted product decisions, Git
+pushes, merges and production deployments to stay under my control, because
+mistakes there could affect real data or the final product.
 
-The tutor accepted the concept but found the response to the brief
-underdeveloped across twelve observations (full text and per-observation
-response in `docs/product/TUTOR_FEEDBACK_RESPONSE.md`). Five features
-answer them: adaptive per-category purchasing context, a "Which One?" mode
-comparing 2-4 products, transparent FTS5 search over past decisions, demo
-content for an otherwise-empty community, and an optional "influenced my
-decision" marker. Supporting research — verified license/maintenance
-status for 8 reference repositories, real purchase-advice community
-conventions — is in `docs/research/COMPETITIVE_DESIGN_ANALYSIS.md`; schema
-rationale is in `docs/adr/0003` and `0004`.
+The harness was not designed as a minimal system from the start. Most of
+sections 13–28 came in with the product and its design decisions. The
+changes below were responses to failures I actually hit: section 22 after
+the memory crash, 29 and 30 after the real-time audit, and the verification
+levels in section 5 after the release failure.
 
-Every new migration (`src/migrations.ts` 0003-0007) is additive: a
-`DEFAULT 'BUY_PASS'` on `post_mode` means no pre-v2.0 post needs a
-backfill, and the `opinions` table rebuild (needed to make `stance`
-nullable) was verified against both a fresh database and a simulated
-pre-v2.0 database before being committed. One schema decision was caught
-and fixed before any commit through direct testing: `post_outcomes.
-influential_opinion_id` initially defaulted to blocking a delete with a
-foreign-key violation, the opposite of "a deleted opinion must not leave a
-broken reference" — changed to `ON DELETE SET NULL` and re-verified with a
-throwaway script.
+## What failed, and what changed
 
-Two further bugs were found only by exercising the new UI in a real
-browser, not by typecheck or unit tests: the create-post form's
-mode-selector was rendered outside the `<form>` element, so a submission
-never actually carried which mode was selected; and `busboy`'s field-count
-limit, left at its pre-v2.0 value of 30, silently dropped fields once the
-form grew to include every category's context prompts and up to four
-option blocks at once (raised to 200). Both are recorded in commit
-[`a5a62b7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a5a62b7).
+**Memory.** The first deploy crash-looped on OOM kills. scrypt's `N=131072`,
+copied unexamined from the prototype, cost about 128MB per hash on a 256MB
+machine, at every boot.
 
-Demo content (18 scenarios, `src/demo-scenarios.ts`) was authored by
-Claude as part of this development session, never via a runtime LLM API
-call. Images are a verified hybrid: four real Wikimedia Commons
-photographs with checked, recorded licenses
-(`docs/research/IMAGE_PROVENANCE.md`), and original `sharp`-composited
-illustrations elsewhere — both re-encoded through the same path a real
-upload goes through.
+- The fix lowered N
+  ([`7a14d4d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7a14d4d)).
+- A unit test now caps the hash's memory cost.
+- `CLAUDE.md` gained section 22.
 
-Commits: backend
-([`c865244`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c865244)),
-frontend plus the two bug fixes
-([`a5a62b7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a5a62b7)),
-41 new tests across five spec files
-([`5492bf0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/5492bf0)).
-`pnpm check` passes: 116 tests (75 pre-existing, unchanged, plus 41 new),
-verified against a freshly reset local database. Developed entirely on
-`feature/buy-or-pass-v2`; per explicit instruction for this session, not
-merged to `main` or deployed to the live Fly app.
+Two weeks later, the same rule caught a second case that its own advice
+had missed:
 
-## v2.0 after its first pass: audits, a real catalog, live everything
+- Parallel `sharp` decodes took a local server from about 135MB to about
+  580MB for one four-WebP post.
+- The demo seeder reached about 375MB.
+- `--max-old-space-size` could not have shown either, because `sharp`'s
+  buffers sit outside the V8 heap.
 
-Each later change on the branch came out of looking at the running app, not
-from the plan:
+A process-wide decode slot brought these to about 250MB and 195MB
+([`4e1674b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4e1674b)),
+and section 22 now asks for measured RSS. These are macOS figures, not
+Fly's.
 
-- A visual design audit, run on screenshots of real labelled content at
-  three viewports, found a logged-in nav 465px wide on a 390px screen and
-  demo illustrations with truncated labels
-  ([`899ca05`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/899ca05)),
-  then shaped the approved "Decision Studio" redesign
-  ([`58675e7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/58675e7)).
-  Screenshot review also caught Which One? cards always reading "No opinions
-  yet", because the card looked for stance counts a comparison post never
-  has
-  ([`d3545b3`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/d3545b3)).
-- A demo "photo" of headphones turned out to be a 100px line icon rendered
-  as a black square; it was replaced with a licensed photograph, and
-  source-linked real-world purchase discussions were added as clearly
-  separate, vote-free cards
-  ([`c511a37`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/c511a37)).
-- Discover moved from fictional demos to 72 real products from Amazon
-  Berkeley Objects (CC BY 4.0) with no prices, ratings or engagement, and
-  the demos moved to a labelled `/showcase` archive
-  ([`cfb2379`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/cfb2379),
-  [`8031431`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8031431),
-  [`f04658e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/f04658e)).
-- A two-browser acceptance audit found that only votes met the brief's
-  "visible within about a second" bar: new questions, edits, outcomes,
-  influential markers and deletions all needed a reload. Every shared change
-  now broadcasts an id-only event, and each page refetches its own
-  server-rendered live regions
-  ([`8911295`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8911295);
-  contract in ADR 0005,
-  [`cdaf36f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/cdaf36f)).
-- During that audit a test run aimed at the wrong target wrote test accounts
-  into the preview database. The spec and every account-creating browser
-  script now refuse any instance that doesn't report itself disposable, and
-  `scripts/verify-realtime.mjs` keeps two browsers open across the whole
-  live-update matrix
-  ([`6214d4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/6214d4a)).
+**Real-time.** A two-browser audit on 2026-11-03 found that only votes met
+the one-second bar. New questions, edits, outcomes, influential marks and
+deletions all needed a reload.
 
-The branch was merged to `main` as
-[`7ac3504`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7ac3504),
-whose message records that migrations 0003-0008 were rehearsed on a backup
-of the live database (integrity ok, no foreign-key violations, existing
-live content preserved).
+The fix sends id-only events and has each page refetch its own
+server-rendered live regions
+([`8911295`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8911295),
+[ADR 0005](docs/adr/0005-realtime-event-contract.md)). Section 29 makes this
+cover every shared change. `scripts/verify-realtime.mjs` keeps two browsers
+open, one on a phone viewport, across the whole matrix, which includes:
 
-## v2.0 release: an image that never booted
+- offline and reconnect;
+- six concurrent voters.
 
-The v2.0 merge to `main` failed CI (run 41562150309) and so never deployed;
-production stayed on the pre-v2.0 build. The spec reported only "nothing is
-answering", but the container log showed the real cause: `src/server.ts`
-imports `scripts/seed-demo-content.ts` (the admin demo-seed route), and the
-Dockerfile's final stage copied only `src/`. Every local run had used the
-whole working tree, so nothing before CI ever exercised the built image.
-The Dockerfile now also copies the seeder and the licensed source photos it
-reads at runtime
+**Test contamination.** During that audit a test run aimed at the wrong port
+wrote test accounts into the preview database. The spec and every
+account-creating script now refuse any target that doesn't report itself
+disposable, and `verify-admin` needs an explicit database path
+([`6214d4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/6214d4a);
+section 30).
+
+**Packaging.** The v2.0 merge failed CI and never deployed. `src/server.ts`
+imported the demo seeder, but the Dockerfile copied only `src/`. Every local
+run used the whole working tree, so nothing before CI had exercised the
+image.
+
+The Dockerfile now ships the seeder and its photos
 ([`0345862`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/0345862)).
-With no container runtime on the development machine, the
-fix was checked against a directory holding exactly the image's file set:
-without `scripts/` it reproduced the CI crash; with it, the app booted,
-`pnpm check` passed (201 tests) against it, `scripts/verify-admin.mjs` seeded
-the demo set through a real browser, and the seeded posts and images
-survived a restart. The image itself is first built by CI.
+Section 5 now separates typecheck, spec, real-browser, container and
+production evidence, and forbids reporting one as another. With no local
+container runtime, the fix was checked against a directory holding exactly
+the image's file set. That reproduced the crash without the seeder and
+passed the spec with it.
 
-Exercising that route exposed a second, memory problem the merge would have
-shipped: the seeder re-encoded its source photos (up to 5472x3648) at full
-size, bypassing the 1600px bound real uploads get. Measured locally with
-`/usr/bin/time -l` around the server during one admin seed, peak RSS was
-~375MB; bounding the seeder to the same `OUTPUT_MAX_DIMENSION` brought it to
-~195MB, and the stored demo images from 9.6MB to 3.0MB. These are macOS
-figures, not Fly's Linux ones, and `--max-old-space-size` would not have
-caught this, since `sharp`'s decode buffers live outside the V8 heap — the
-before/after difference is the evidence, not the absolute numbers.
+Earlier, browser testing alone caught two v2.0 bugs that typecheck and the
+spec missed ([`a5a62b7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a5a62b7)):
 
-That prompted the same measurement on the ordinary upload path, with
-worst-case-but-valid images (4096x4096, small files) posted to a fresh
-disposable server per scenario. `src/images.ts` claimed
-`sharp.concurrency(1)` made concurrent uploads queue; it only limits threads
-within one image, and a post's photos went through `Promise.all`, so they
-decoded in parallel. One post with four WebPs (1.3MB in total) took the
-server from ~135MB to ~580MB. Every decode now takes one process-wide slot
-(`src/image-slot.ts`, unit-tested in `spec/unit.test.ts`); peaks fell from
-~280MB to ~180MB for four PNGs, ~580MB to ~250MB for four WebPs, and ~620MB
-to ~260MB for three such WebP posts at once. WebP is still the most
-expensive format (~110MB above baseline for one 16-megapixel image) and was
-not traced further: its cost comes from inside libvips/libwebp, and Fly's
-Linux/musl build may behave differently. Watching the live machine's memory
-after the next deploy is the remaining check. Both memory fixes are in
-[`4e1674b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4e1674b).
+- a mode selector outside its `<form>`;
+- a multipart field limit silently dropping fields.
 
-Verification of all three fixes together, on 2026-11-03, against a
-`pnpm dev:test` instance built from the working tree:
+What changed how I work with the agent started earlier, with Bug Relay. An
+agent can implement the features I describe and the result can still be hard
+to use. The bug reproduction flow existed, but going through its steps felt
+awkward and didn't work the way I had imagined. Part of that was because I
+hadn't explained the interaction clearly enough. I learned that I can't just
+describe an idea and accept the result because the agent says it is
+finished. I need to open the website, try the actual interactions, and see
+whether they work for a real user. The real-time and deployment failures
+above reinforced that lesson. The real-time gaps showed up with two browsers
+open side by side, and the packaging failure only when CI ran the actual
+image.
 
-- `pnpm typecheck` clean;
-- `pnpm test`: 203 of 203 across 20 spec files (the 201 above plus the two
-  decode-slot unit tests);
-- `pnpm check:evidence` passing;
-- in real headless Chromium:
-  - `scripts/verify-browser.mjs` passed, with live updates in 56-82ms;
-  - `scripts/verify-admin.mjs` passed, including the seed and its no-op
-    re-run;
-  - `scripts/verify-realtime.mjs` passed, at 52ms median and 86ms maximum
-    end to end over 32 samples, and 8ms maximum from commit to visible;
-  - `scripts/verify-catalog.mjs` passed.
+## Verification, and what it does not show
 
-These are localhost timings, not production ones. Not yet done:
-- building the Docker image (CI is the first place that happens);
-- the trufflehog secret scans, which only run in CI;
-- measuring memory on Fly itself.
+Production checks:
+
+- The fix merge
+  ([`611c9b6`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/611c9b6))
+  passed CI, which builds the image and runs the spec against it, and
+  deployed as Fly release v8.
+- Two live browsers saw updates in 96–179ms.
+- Server RSS was about 105MB.
+- Data survived a machine restart.
+
+Two additions came from the last acceptance runs:
+
+- A slow-network run found that a double-click on "Publish post" over
+  Chrome's Slow 3G profile created two posts, 5 times in 5 attempts. Each
+  POST form now submits once: 0 duplicates in 5
+  ([`9016912`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/9016912)).
+- `spec/buyer-decides.test.ts` checks that a lopsided vote never becomes an
+  outcome, and that the buyer can decide against the majority
+  ([`60fab79`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/60fab79)).
+
+On 2026-11-08, against a disposable local instance:
+
+- typecheck: clean;
+- spec: 210 of 210;
+- `check:evidence`: passing;
+- `verify-browser`, `verify-admin` and `verify-catalog`: all passed;
+- `verify-realtime`: passed with the desktop browser at 1440×900, and again
+  at the marking viewport of 1920×1080 beside 390×844
+  ([`8d8f744`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8d8f744)),
+  with an end-to-end maximum under 90ms.
+
+These are localhost timings.
+
+What none of this shows is the judged half of the README:
+
+- whether the opinions help someone decide;
+- whether context makes advice more relevant;
+- whether one sentence is easy to give.
+
+[`HUMAN_EVALUATION_PROTOCOL.md`](docs/product/HUMAN_EVALUATION_PROTOCOL.md)
+is prepared but has not been run. A scripted prototype of a lower-friction
+decision flow was tried outside the repo with fictional personas; it was not
+implemented before submission, and fictional personas are not user evidence.
+
+The C10 log rehearsal was two automated browser profiles, not a classroom
+demonstration.
+
+What I most want to find out with real users is whether Buy or Pass
+actually helps people make purchasing decisions. Not only whether they can
+click Buy or Pass, but whether the opinions help them understand their
+options, feel less uncertain, and decide with less effort. I also want to
+see whether old discussions are useful to someone looking at the same or a
+similar product. Passing automated tests cannot show any of this, and none
+of it has been tested with people yet.

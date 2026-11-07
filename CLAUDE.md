@@ -1,376 +1,385 @@
 # Your harness
 
-This is the project harness for the **COMP4020/COMP8020 Final Project**
-("Buy or Pass"): one repository, built across crits 8, 9, 10 and the final
-submission. What the product is and what "good" means for it belongs in
-`README.md`; this file holds the process rules the agent is held to while
-building it.
+This is the harness for the COMP4020/COMP8020 Final Project, **Buy or Pass**. It
+lives in one repository, built across crits 8, 9 and 10 and the final
+submission. `README.md` says what the product is and what "good" means.
+This file says what the agent is held to while building it.
 
-This harness is a **deliberate merge-forward**, not a copy, from the Crit 7
-harness (`comp4020-crit7-GuangdeShi`), which was itself merged forward from
-Assignment 2. Sections 1–12 below are workflow/process rules that have now
-survived two product pivots (Pick-Up Sticks → Bug Relay → Buy or Pass)
-because none of them depend on any one product.
+It has two parts:
 
-**Crit 8 → 9 pivot:** this repo's Crit 8 submission was "Pick-Up Sticks."
-For Crit 9 the product changed to Bug Relay — see `PROCESS.md` for that
-reasoning.
+- **Sections 1–12** are reusable development rules. They were carried
+  forward from Crit 7
+  ([`4183f5b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4183f5b))
+  and survived both product pivots: Pick-Up Sticks → Bug Relay → Buy or Pass
+  (ADR 0001, ADR 0002).
+- **Sections 13–30** are Buy or Pass's own constraints. Most of them were
+  added after a specific failure; the commit is named where that is so.
 
-**Crit 9 → Final pivot:** for the Final Project the product changed again,
-to Buy or Pass — a social shopping-opinion platform. See
-`docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md` and `PROCESS.md` for the
-full reasoning, what migrated from the isolated Buy or Pass prototype, and
-what was preserved from Bug Relay's own history. The process rules below
-(sections 1–12) are unaffected by this pivot either, since none of them
-depended on Bug Relay's specific product. Sections 13+ are Buy or Pass's own
-product-specific rules, carried in from the prototype's harness.
+Section numbers are stable, because ADRs and research notes cite them. A rule
+that changes keeps its number.
+
+Keep this file sufficient, not exhaustive. Long reasoning belongs in an ADR or
+a test, and the rule links to it. A new rule needs a real failure or a real
+decision behind it.
 
 ## 1. Audit before acting
 
-Before starting a new stage of work, check the repo's actual current state —
-`git status`/`git log`, and the live spec on the course website — rather than
-assuming it from memory or from this file. This file goes stale as the
-project grows across ten weeks; what's true now is whatever a quick check
-confirms.
+Before a new stage of work, check the actual state rather than this file or
+memory:
+
+- `git status` and `git log`;
+- the brief on the course website;
+- for anything about deployment, `flyctl status` and `flyctl releases`
+  (read-only).
+
+The "Current project state" block at the end is a snapshot that goes stale.
 
 ## 2. Decision boundary
 
-The agent may research, propose alternatives, implement an approved
-direction, and verify it. When a genuinely ambiguous product or design
-decision comes up — what "good" means for this app, what counts as a
-"person," what persists versus expires, a stack choice — don't silently pick
-one and move on. Name the decision, give the options considered, and either
-wait for a call or take the smallest reasonable default that keeps things
-moving, recording *which* default and *why* (a short decision record, e.g. in
-`PROCESS.md`) so it can be revisited.
+The agent may investigate, propose alternatives, implement an approved
+direction, and verify it.
+
+Two kinds of decision stay with the developer:
+
+- **Product-value decisions:** what "good" means, what counts as a person,
+  what persists, the stack, which features exist.
+- **High-risk actions:**
+  - pushing, merging, deploying, or changing Fly secrets;
+  - writing to production or preview data;
+  - destructive volume or database operations;
+  - force-pushing or rewriting history.
+
+When an ambiguous product decision comes up, name it and give the options.
+Then either wait, or take the smallest reasonable default and record which
+default and why. A high-risk action always waits for explicit, in-the-moment
+approval. An approval given for one release does not carry over to the next.
 
 ## 3. Stack is a real decision, not boilerplate
 
-The final project brief deliberately ships no starter framework. Whatever
-stack gets chosen is a real architectural decision and gets a short rationale
-in `PROCESS.md` — not because the course asks for ceremony, but because the
-project outgrowing a first choice (e.g. adding real-time in week 10) is
-expected, and the record of *why* the first choice was made is what makes a
-later switch legible rather than arbitrary.
+The brief ships no starter framework, so the stack gets a short rationale in
+`PROCESS.md`. That record is what makes a later change of stack legible
+rather than arbitrary.
 
-## 4. Spec / backpressure philosophy
+## 4. Spec is backpressure, not judgement
 
-`spec/` protects the promises that can be checked mechanically — a route
-responds, the core flow survives a reload, a shipped invariant holds. It is
-backpressure, not a substitute for judgement: whether the app is actually
-*good* — satisfying, legible, worth the visit — is a human call (the crit,
-the tutor), not something a passing test proves. Say those open, judged
-items out loud rather than quietly deciding no test is needed.
+`spec/` protects the promises that can be checked mechanically. Whether the
+app is actually good is a human call, made by the crit, the tutor or a user
+study.
 
-## 5. Verification before acceptance
+Mark each README claim as **enforced** (a check fails if it breaks) or
+**judged** (a person assesses it). Say the open judged items out loud. See
+`docs/evidence/GOOD_TO_EVIDENCE.md`.
 
-Don't report a feature as working because the agent says so, because
-`pnpm typecheck`/`pnpm test` is green, or because the code looks plausible.
-For a UI change, that means actually exercising it — the golden path and at
-least one edge case (a reload, a duplicate action, a restart) — before
-calling it done.
+## 5. Verification before acceptance, at the right level
 
-If no real graphical browser or browser-automation tool is available in the
-current environment, say so explicitly rather than reporting that browser
-verification occurred. A built server driven over HTTP, or an automated test
-suite, is real evidence, but it is not the same claim as "verified in a
-browser," and shouldn't be presented as one.
+An agent's own completion claim is not evidence. A green suite proves only
+what it exercises. Report every result at the level it actually reached:
 
-## 6. Accessibility / invariant checks
+1. **Typecheck** (`pnpm typecheck`): types only.
+2. **Spec** (`pnpm test`): HTTP against a running disposable instance.
+3. **Real browser:** `scripts/verify-*.mjs` in Chrome or Chromium. This is the
+   only level that sees layout, live updates across two sessions, and form
+   wiring.
+   - Two v2.0 bugs were found only here, in
+     [`a5a62b7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/a5a62b7).
+   - The two-browser audit found most shared changes weren't live, fixed in
+     [`8911295`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8911295).
+4. **Container:** the image `Dockerfile` builds, in CI.
+   - Local runs use the whole working tree, so they cannot show a file
+     missing from the image. That is how the v2.0 release failed, fixed in
+     [`0345862`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/0345862).
+   - Anything `src/` imports or reads at runtime must be copied into the
+     final stage.
+   - With no local container runtime, check against a directory holding
+     exactly the image's file set, and say that is what was done.
+5. **Production:** read-only checks against `*.fly.dev`, `flyctl status` and
+   `flyctl logs`.
 
-`spec/invariants.test.ts` ships with the starter and stays green always — a
-real title, a nav/landmark structure sane enough for a one-page app, alt text
-where images exist, a mobile viewport meta tag. It's not this week's
-contract, but it's still true of any page this app serves.
+For a UI change, exercise the golden path and at least one edge case before
+calling it done. The edge case can be a reload, a duplicate action, a
+restart, or a slow network.
+
+Never present a lower level as a higher one:
+
+- localhost timings are not production timings;
+- macOS memory figures are not Fly figures;
+- scripted personas are not user research.
+
+If a level wasn't reached, say so.
+
+## 6. Page invariants
+
+`spec/invariants.test.ts` ships with the course and stays green. Every page
+has:
+
+- a real title;
+- a mobile viewport meta tag;
+- alt text where images exist.
+
+`/readme/` publishes the README's headings in order, and unknown routes 404.
+Both marking viewports (1920×1080 and 390×844) must work without horizontal
+scroll.
 
 ## 7. Git / commit discipline
 
-Commit at meaningful stage boundaries — not one giant commit at the end, not
-one per file save. Before staging: run `git status`/diff and actually look at
-what's included; never stage blindly (`git add -A`/`git add .` without
-review). Commit messages name the decision or capability that landed, not
-"update files" or "progress." History isn't rewritten or squashed casually —
-`PROCESS.md` and each week's reflection cite real commit hashes, so the log
-has to stay an honest record of how the work actually went. Never force-push.
+- Commit at meaningful stage boundaries.
+- Before staging, read `git status` and the diff. Never run `git add -A` or
+  `git add .` blind.
+- A message names the decision or capability that landed.
+- Never amend, squash, rebase or force-push published history. `PROCESS.md`
+  and the reflections cite real hashes.
+- Leave uncommitted work that belongs to someone else's review unstaged.
 
 ## 8. Secret handling
 
-Never commit `mise.local.toml`, `.env` files, the Fly API token, or any other
-credential. The repo's own `.githooks/pre-commit` secret scan and the CI
-trufflehog scan are the backstop; don't bypass or disable them to get a
-commit through.
+Never commit any of these:
 
-## 9. Process evidence
+- `mise.local.toml`;
+- `.env` files;
+- the Fly token;
+- any other credential.
 
-`PROCESS.md` and `reflections/crit-N.md` cite real commit hashes or compare
-ranges, not paraphrase what happened. Don't overwrite or destroy earlier
-process/reflection material from a prior crit; extend it. `pnpm check:evidence`
-enforces the mechanical parts of this (the files exist, cited commits exist).
+`.githooks/pre-commit` and CI's trufflehog scan are the backstop. Don't
+bypass them.
+
+## 9. Process evidence and authorship
+
+- `PROCESS.md` and `reflections/crit-N.md` cite real commit hashes, not
+  paraphrase. `pnpm check:evidence` checks that cited commits exist.
+- `PROCESS.md` is rewritten to describe the current project, as the brief
+  asks. The full earlier account is kept in `docs/evidence/PROCESS_LOG.md`.
+- Reflections are never overwritten.
+- The student drafts these themselves, per the brief:
+  - `README.md`;
+  - `PROCESS.md`;
+  - `research-note.md`;
+  - the reflection answers.
+
+  The agent may find sources, check citations, report facts and gaps, and
+  propose wording for review. It must not supply the student's motivations or
+  judgements. Where those are needed, it leaves a clearly marked placeholder.
 
 ## 10. Step-by-step execution and reporting
 
-For any non-trivial stage of work: break it into a small number of concrete
-steps, show the step list, execute one step at a time, and report back —
-files touched, what was verified, what's next — before continuing. Where the
-student has explicitly asked for a specific crit to be built efficiently and
-end-to-end without stopping for minor decisions, that instruction governs for
-that crit; this section is the default, not an override of an explicit
-one-off request.
+For a non-trivial stage:
+
+1. List the steps.
+2. Do one at a time.
+3. Report what changed, what was verified, and what is next.
+
+An explicit request to work end-to-end overrides this for that request.
 
 ## 11. Scope control
 
-Keep each crit to what that week's spec actually asks for. Don't add a
-feature the brief doesn't ask for yet, however natural it seems to reach for
-— real-time/multiplayer, accounts, AI features, and polish beyond the current
-week's bar are all examples of scope that stays deferred until the week that
-actually calls for it. When it's unclear whether something is in scope,
-default to leaving it out and name the call (see section 2).
+Build only what the brief and the Definition of Good call for. A feature
+that doesn't trace to the README earns nothing and adds risk.
+
+Near a deadline, prefer fixing, verifying and documenting what exists over
+new features. A proposal with real cost goes to the developer first (section
+2). One example is the 2026-11-05 decision brief UX: prototyped outside the
+repo, recommended for user testing, not implemented.
 
 ## 12. Communication language
 
-Where the student has set a language preference for how the agent talks to
-them, that preference governs the agent's own reports, explanations,
-warnings, decisions, and questions — nothing else. Everything that ships in
-or with the repo (code, code comments, commit messages, README, PROCESS.md,
-reflections, and any other submission-facing content) stays in English
-regardless of that preference.
+The student's language preference governs only the agent's own reports and
+questions. Everything in the repo stays in English: code, comments, commits
+and documents.
 
 ## 13. The Definition of Good governs every decision
 
-Buy or Pass's product argument is: *good advice is relevant, honest, and
-easy to give. The purchase belongs to the buyer. The opinions belong to the
-community.* Every architecture choice, UI copy decision, and test in this
-repo should trace back to that, not to generic CRUD-app best practice. When a
-feature request would compromise it (e.g. "just show an aggregate
-recommendation so the author doesn't have to read all the opinions"), name
-the conflict and don't silently take the easy path.
+*Good advice is relevant, honest, and easy to give. The purchase belongs to
+the buyer. The opinions belong to the community.*
 
-## 14. Authentication says who; authorization says what — and authorization is server-side, always
+Architecture, copy and tests trace back to that, not to generic CRUD
+practice. When a request would compromise it, name the conflict. For example,
+"just show an aggregate recommendation" would.
 
-Every mutating route re-derives "who is calling" from the session cookie
-(`resolveSession` in `src/auth.ts`), never from a client-supplied user ID.
-Every route that changes or reveals user-scoped data checks ownership
-explicitly, in the handler, next to the action it guards. The concrete
-rules, enforced in `src/server.ts`:
+## 14. Authorization is server-side, in the handler
 
-- A user may edit or delete only their **own** posts and opinions.
-- Only a post's **author** may record that post's purchase outcome.
-- A post's **author never submits an opinion on their own post** — by
-  design (see README "Buyer agency"), not an oversight.
-- Admin/observability routes (`/admin*`) require `isAdmin`, checked
-  server-side on every request, including the SSE log stream and the stats
-  API — never just hidden nav links.
+Every mutating route derives the caller from the session cookie
+(`resolveSession`, `src/auth.ts`), never from a client-supplied id. The
+ownership check sits in the same handler as the action. Enforced in
+`src/server.ts`:
 
-If you add a new mutating route, add its authorization check in the same
-function as the mutation, and add a test in `spec/posts-and-opinions.test.ts`
-that calls it as the *wrong* user and asserts a 403/404.
+- users edit or delete only their own posts and opinions;
+- only a post's author records its outcome;
+- an author never opines on their own post;
+- `/admin*` requires `isAdmin` on every request, including SSE and the stats
+  API.
+
+A new mutating route gets its check, plus a wrong-user test in
+`spec/posts-and-opinions.test.ts`.
 
 ## 15. One current opinion per (post, user) is a database guarantee
 
-`opinions` has a real `UNIQUE(post_id, user_id)` constraint, and
-`upsertOpinion` (`src/db.ts`) is a single `INSERT ... ON CONFLICT DO UPDATE`
-statement. Never "check if an opinion exists, then insert or update" as two
-separate statements — that reintroduces the race this schema exists to
-prevent. The full concurrency reasoning (why synchronous `node:sqlite`
-access makes this safe in a single process, and what a multi-process
-deployment would need instead) lives in
-`docs/architecture/DATA_MODEL.md`.
+`opinions` has `UNIQUE(post_id, user_id)`. `upsertOpinion` is a single
+`INSERT ... ON CONFLICT DO UPDATE`. Never check-then-insert. The reasoning is
+in `docs/architecture/DATA_MODEL.md`.
 
 ## 16. Never fabricate counts, votes, or activity
 
-Per README "Honest results," Buy/Pass counts, opinion lists, and the admin
-stats page must always be computed live from the `opinions` table — never a
-cached or precomputed "engagement score," and never seeded with fake votes
-to make a demo post look more active.
+Counts, opinion lists and admin stats are computed live from `opinions`.
+There is never a stored "engagement score", and demos never get seeded votes.
+This backs README "Honest data".
 
-## 17. Structured logging: identifiers only, never content or secrets
+## 17. Structured logging: identifiers only
 
-`src/logger.ts`'s `logEvent` is the only path that should write to
-`activity_events` or stdout for user actions. Never log: passwords, raw
-session cookie or CSRF token values, full email addresses, uploaded image
-bytes, or free-text content (comments, descriptions, reflections).
+`logEvent` (`src/logger.ts`) is the only path to `activity_events` and to
+stdout for user actions. Never log any of these:
 
-## 18. Image uploads: never trust the declared type, never trust the client filename
+- passwords;
+- session or CSRF values;
+- full emails;
+- image bytes;
+- free text.
 
-`src/images.ts`'s `processAndStoreImage` is the only path that writes an
-uploaded file to disk. It verifies the file is real by actually decoding it
-with `sharp`, re-encodes to JPEG (stripping EXIF/metadata as a side effect),
-and stores it under a server-generated opaque UUID filename.
+## 18. Image uploads: decode, re-encode, rename
 
-## 19. Unlisted is link-gated, not cryptographically private — say so
+`processAndStoreImage` (`src/images.ts`) is the only writer of uploaded files.
+It does three things:
 
-An `unlisted` post is excluded from the feed/search/category browsing but is
-fully viewable by anyone with its URL. Don't let any UI copy imply unlisted
-posts are "private" or "secure" beyond that.
+1. Decodes the file with `sharp`, which rejects anything that is not a real
+   image.
+2. Re-encodes it to JPEG within `OUTPUT_MAX_DIMENSION`, which strips
+   metadata.
+3. Stores it under a server-generated UUID.
 
-## 20. The recommendation surface is a replaceable interface, not a model
+Every decode takes the process-wide slot in `src/image-slot.ts` (section 22).
 
-`src/recommendation/types.ts` defines `RecommendationService`;
-`src/recommendation/chronological.ts` is the only implementation, explicitly
-transparent (category/interest boost, no learned ranking). **Never** fold a
-user's BUY/PASS stance into their own interest/affinity signal — voting PASS
-on a product is not evidence the voter dislikes that category.
+## 19. Unlisted is link-gated, not private
 
-## 21. Protect the Fly volume's Bug Relay data
+An unlisted post is out of feed, search and live feed events, but anyone with
+the URL can view it. Copy must not call it private or secure.
 
-The live Fly volume still holds Bug Relay's SQLite database at
-`/data/bug-relay.db`, from before this pivot. Buy or Pass uses distinct
-paths (`DATABASE_PATH=/data/buyorpass.sqlite`, `UPLOAD_DIR=/data/uploads`,
-set in `fly.toml`). Never point Buy or Pass's own paths at
-`/data/bug-relay.db`, never write a migration or cleanup script that deletes
-or reformats the volume, and never run a destructive `flyctl volumes`
-command against this app without the student's explicit, in-the-moment
+## 20. The recommendation surface is replaceable and transparent
+
+`RecommendationService` (`src/recommendation/types.ts`) has one
+implementation: chronological with a category boost, no learned ranking.
+Never fold a user's own BUY/PASS stance into their interest signal.
+
+## 21. Protect the Fly volume's earlier data
+
+The volume still holds `/data/bug-relay.db` and the older Pick-Up Sticks
+data. Buy or Pass uses `/data/buyorpass.sqlite` and `/data/uploads`
+(`fly.toml`). Never point at the old files. Never write cleanup that deletes
+them. Never run a destructive `flyctl volumes` command without explicit
 approval.
 
-## 22. This machine has 256MB total — verify memory, don't assume it
+## 22. 256MB total: measure memory, don't assume it
 
-A real production incident (see `PROCESS.md`, "A real production
-incident") crash-looped the live app on out-of-memory kills because
-`src/auth.ts`'s scrypt parameters, which never mattered on a development
-machine's effectively unlimited RAM, consumed roughly half of this app's
-actual 256MB budget on every single boot. Before changing anything that
-allocates non-trivial memory (crypto KDF parameters, image/buffer
-processing, an in-memory cache, a new dependency with its own native
-runtime), check its actual memory cost against 256MB minus Node's own
-baseline footprint — don't assume "it works locally" transfers, since local
-development machines have no comparable ceiling. Where feasible, verify
-with a constrained local run (`node --max-old-space-size=<N>`) before
-deploying, the way this incident's fix was actually confirmed.
+The first deploy crash-looped on OOM kills. scrypt's `N=131072` cost about
+128MB per hash, and a hash runs at every boot. Fixed in
+[`7a14d4d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/7a14d4d).
 
-## 23. A post's mode gates which opinion shape it accepts — enforced server-side, by loading real rows
+Later, parallel `sharp` decodes reached around 580MB locally for one
+four-WebP post. The demo seeder hit around 375MB. Fixed in
+[`4e1674b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/4e1674b).
 
-`posts.post_mode` is `BUY_PASS` or `WHICH_ONE` (`docs/adr/0003-post-modes-
-and-comparison-voting.md`). `src/server.ts`'s opinion-submission handler
-rejects a BUY/PASS-shaped submission on a `WHICH_ONE` post and a
-comparison-shaped submission on a `BUY_PASS` post, in both directions, with
-a 400 — never silently reinterpreted. A comparison opinion's
-`selectedOptionId` is only ever accepted after loading the actual
-`PurchaseOption` row and checking `option.postId === postId`; a fabricated
-id or a real id belonging to a *different* post is rejected the same way.
-If you add a new opinion-shaped mutation, add both directions of this
-rejection test in `spec/comparison.test.ts`.
+Before changing anything that allocates real memory, measure it:
 
-## 24. Buy/Pass counts and comparison-option counts are computed by separate, guarded queries
+- process RSS (`/usr/bin/time -l` or similar);
+- worst-case-but-valid inputs;
+- a fresh disposable server per scenario.
 
-`getOpinionCounts` has an explicit `AND stance IS NOT NULL` guard precisely
-because `opinions.stance` is nullable now that comparison opinions share the
-table — a new query against `opinions` that counts by stance without that
-guard will silently include rows where `stance` is NULL alongside the two
-real values, but SQLite's `GROUP BY` simply won't match them, which
-reads as "fine" until you reason it through. Comparison counts go through
-the separate `getOptionCounts`, grouped by `selected_option_id`. Never
-write one query that tries to compute both.
+`--max-old-space-size` alone misses `sharp`, whose buffers live outside the
+V8 heap. Report local figures as local.
 
-## 25. Context prompts are a reviewed code config; a post's answers are real, optional, per-post data
+## 23. A post's mode gates its opinion shape, server-side
 
-`src/context-prompts.ts` holds the data-driven, category-keyed prompt
-definitions (`docs/adr/0004-context-prompts-and-demo-provenance.md`) — treat
-changes to it like a schema change (reviewed, versioned via
-`CONTEXT_SCHEMA_VERSION` if a key's *meaning* changes, not just its
-wording). A post's actual answers only ever produce a `post_context` row
-when at least one prompt was answered or free text was given — never insert
-a row of all-empty answers "just in case." `contextCard()` in
-`src/render.ts` already only renders prompts with a non-empty answer; the
-real backstop is that an unanswered post has no row to render from at all.
+`post_mode` is `BUY_PASS` or `WHICH_ONE` (ADR 0003). The opinion handler
+rejects the wrong shape in both directions with a 400. It accepts a
+`selectedOptionId` only after loading the option and checking
+`option.postId === postId`. A new opinion-shaped mutation gets both
+rejection tests in `spec/comparison.test.ts`.
 
-## 26. Demo content is real rows with `is_demo = 1` — never a parallel system, never mixed into real aggregates
+## 24. Buy/Pass counts and option counts are separate, guarded queries
 
-A demo post/user is created through the exact same `createPost`/
-`createDemoUser`/`upsertOpinion` functions real content uses
-(`scripts/seed-demo-content.ts`), with `isDemo: true` passed through —
-never a separate demo-only code path, so a demo post is guaranteed to
-behave like a real one structurally. Every feed, search, or aggregate-stat
-query that should reflect only real activity needs an explicit `is_demo =
-0` guard (see `listFeed`, `listMostDiscussed`, `activityStats`'s intended
-use) — a new query over `posts` or `users` that omits this guard will
-silently count fictional demo content as real community activity. The
-`/showcase` archive (legacy `/discover/demo` and `?source=demo` redirect
-there) is the only listing where `is_demo = 1` content is deliberately shown;
-Discover's Products and Questions views never show it. A demo post's own page
-is always shown behind the persistent "Demo scenario —
-AI-generated fictional content" banner, never a dismissible tag.
+`getOpinionCounts` keeps `AND stance IS NOT NULL`, because comparison opinions
+share the table with a NULL stance. Option counts go through
+`getOptionCounts`. Never compute both in one query.
 
-## 27. The influential-opinion marker is owner-set, same-post-scoped, and never changes a vote count
+## 25. Context prompts are reviewed code config; answers are optional data
 
-`post_outcomes.influential_opinion_id` can only be set by the post's own
-author (checked server-side, same pattern as every other ownership check in
-this file), and only to an opinion that actually belongs to that same post
-— checked by loading the real `Opinion` row and comparing its `postId`,
-never trusted from the URL. It uses `ON DELETE SET NULL`, not this schema's
-usual `ON DELETE CASCADE`, specifically so deleting the marked opinion
-leaves the outcome row intact with the marker cleared, rather than either
-cascading away the whole outcome or blocking the delete with a foreign-key
-violation — verified directly with a `node:sqlite` script before relying on
-it (see ADR 0003's migration notes). Marking is independent of recording a
-purchase outcome (it can be set before any outcome row exists at all) and
-must never be folded into vote-count queries.
+`src/context-prompts.ts` (ADR 0004) is treated like a schema. Bump
+`CONTEXT_SCHEMA_VERSION` if a key's meaning changes. A `post_context` row
+exists only when something was answered. `contextCard` renders only answered
+prompts.
+
+## 26. Demo content is `is_demo = 1` rows, never mixed into real aggregates
+
+Demos go through the same `createPost`, `createDemoUser` and `upsertOpinion`
+as real content (`scripts/seed-demo-content.ts`). Every feed, search or stat
+over real activity needs `is_demo = 0`. Demos are listed only in `/showcase`.
+The legacy `/discover/demo` and `?source=demo` redirect there. A demo page
+always carries the non-dismissible "Demo scenario — AI-generated fictional
+content" banner.
+
+## 27. The influential marker is owner-set, same-post, count-neutral
+
+Only the post's author may set `post_outcomes.influential_opinion_id`, and
+only to an opinion loaded and checked to belong to that post. It is
+`ON DELETE SET NULL`, verified before use (ADR 0003). It is independent of
+recording an outcome, and it never enters a vote count.
 
 ## 28. Catalog products are facts, never engagement or prices
 
-`src/catalog.ts` (migration 0008) holds real product records imported from a
-licensed dataset (`docs/research/PRODUCT_CATALOG_PROVENANCE.md`). A catalog
-product must never carry a price, rating, review, stock status, discount or
-popularity score. The buyer supplies their own price on their own post. The
-only engagement shown for a product is a live `COUNT` of real public active
-non-demo posts linking to it (`countQuestionsForProduct`). The catalog sync
-is an idempotent upsert that never deletes a product (a real post may link to
-it) and never touches user tables. Every product photo keeps its source image
-id and URL and is credited on its product page and at `/credits`.
+`src/catalog.ts` holds licensed product records
+(`docs/research/PRODUCT_CATALOG_PROVENANCE.md`). A product never carries a
+price, rating, review, stock status, discount or popularity score. The only
+engagement shown is a live count of real public active non-demo posts
+linking to it.
+
+The sync is an idempotent upsert. It never deletes a product, and it never
+touches user tables. Every product photo keeps its source id and URL and is
+credited at `/credits`.
 
 ## 29. Every shared state change is live, and the server renders it
 
-The brief's real-time bar applies to every user-visible shared change, not
-only votes: new and edited questions, opinion changes and deletions,
-outcomes and influential markers. A new mutation must broadcast on the right
-channel (`src/sse.ts`), **after** its write returns, and never for a rejected
-request. The client must reach the new state by refetching its own
-server-rendered `[data-live-region]`s, not by hand-building viewer-specific
-HTML from the payload. Feed events carry ids only, and only for posts that
-are or were public, active and non-demo. Add the event to
-`spec/realtime-contract.test.ts` and the visible behaviour to
-`scripts/verify-realtime.mjs`. See `docs/adr/0005-realtime-event-contract.md`.
+This applies to every user-visible shared change, not only votes. A two-browser
+audit found most changes needed a reload, fixed in
+[`8911295`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/8911295).
 
-## 30. Tests never touch the preview or production database
+- A mutation broadcasts on the right channel (`src/sse.ts`), after its write,
+  and never for a rejected request.
+- Clients refetch their own server-rendered `[data-live-region]`s. They never
+  build viewer-specific HTML from a payload.
+- Feed events carry ids only, and only for posts that are or were public,
+  active and non-demo.
+- Add the event to `spec/realtime-contract.test.ts` and the behaviour to
+  `scripts/verify-realtime.mjs`.
 
-The spec and every account-creating browser script refuse any target whose
+See ADR 0005.
+
+## 30. Tests never touch preview or production data
+
+The spec and every account-creating script refuse a target whose
 `/healthz/test-target` doesn't report `disposable`. That requires
-`BOP_DISPOSABLE_DB=1`, and is never true on Fly or for a `*preview*`
-database. Run them against `pnpm dev:test` or another throwaway instance.
-Never weaken this check to get a run through: a test run once filled the
-preview database with test accounts.
+`BOP_DISPOSABLE_DB=1`, and is never true on Fly or for a `*preview*` database.
+`scripts/verify-admin.mjs` also requires an explicit `DATABASE_PATH`. Use
+`pnpm dev:test` or another throwaway instance, on a port that is not a
+running preview.
+
+Never weaken this check. A test run aimed at the wrong port once filled the
+preview database with test accounts, fixed in
+[`6214d4a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-guangdeshi/commit/6214d4a).
 
 ---
 
 ## Current project state
 
+Snapshot, checked 2026-11-08. Re-check it before relying on it (section 1).
+
 ```
-PRODUCT:   Buy or Pass — a social shopping-opinion platform. A user posts a
-           purchase they're considering; other logged-in users give an
-           explicit 👍 Buy / 👎 Pass with a short comment (or, since v2.0,
-           pick one of 2-4 compared options); the author decides
-           independently and can later record Bought/Didn't Buy/Still
-           Deciding, optionally marking which opinion influenced them.
-           Migrated from an isolated, fully-verified prototype — see
-           docs/adr/0002-pivot-bug-relay-to-buy-or-pass.md.
-STACK:     TypeScript on Node 24 (type-stripping, no build step), node:sqlite
-           for persistence (including FTS5 full-text search), Server-Sent
-           Events for real-time sync, plus two small npm dependencies
-           (sharp, busboy) for verified image upload handling. Rationale in
-           PROCESS.md.
-STAGE:     Buy or Pass v2.0 — a response to tutor feedback that the original
-           single-product Buy/Pass concept was underdeveloped. Adds adaptive
-           per-category purchasing context, a "Which One?" comparison mode,
-           transparent keyword-based historical-decision search, labelled
-           demo content for an otherwise-empty community, and an optional
-           "influenced my decision" marker — see docs/adr/0003 and 0004 and
-           PROCESS.md for the full record. Later work on the branch added a
-           real product catalog, /showcase, and live updates for every
-           shared change (ADR 0005).
-RELEASE:   v2.0 was merged to origin/main (7ac3504), but CI failed because
-           the image crashed on boot, so it never deployed. The live Fly app
-           still runs the pre-v2 build (7a14d4d). The fixes (image packaging
-           0345862, image-decode memory 4e1674b) are on
-           feature/buy-or-pass-v2 and not yet pushed. Releasing them means a
-           push to main, which auto-deploys and runs migrations 0003-0008 on
-           the live database, so it needs the student's explicit approval.
+PRODUCT:  Buy or Pass. A buyer posts a purchase they're considering, with
+          optional context; others give 👍 Buy / 👎 Pass, or pick one of
+          2-4 options, plus one comment; the buyer alone records the
+          outcome. Discover starts from 72 licensed catalog products;
+          labelled demos live in /showcase.
+STACK:    Node 24 with type-stripping (no build step), node:sqlite with
+          FTS5, Server-Sent Events, sharp + busboy. Rationale in PROCESS.md.
+LIVE:     One shared-cpu-1x 256MB Fly machine, one volume. Deploys go
+          through CI on push to main; check `flyctl releases` for the
+          current release.
+OPEN:     research-note.md not yet written; no human evaluation run
+          (docs/product/HUMAN_EVALUATION_PROTOCOL.md is prepared only).
 ```

@@ -63,7 +63,7 @@ well-defined fallback, not an assumption that enough data always exists.
 ### 5. Expertise/relevance without vote weighting
 
 The brief explicitly warns against building "an expertise badge" gate on who
-may opine (see `README.md` point H and `CLAUDE.md` rule 9) — but a
+may opine (see `docs/research/COMPETITOR_ANALYSIS.md`, "no karma/reputation score") — but a
 *feed-ranking* model raises a related, narrower question: could a user's
 history of *giving* opinions on computing posts be used as a positive
 "interested in computing" signal for feed ranking (as opposed to a
@@ -94,7 +94,7 @@ the voter dislikes laptops, computing, or that category in general. A model
 that folded PASS into a negative-affinity signal would, for example, learn
 to stop showing computing posts to a knowledgeable computing enthusiast who
 gives thoughtful PASS opinions specifically *because* they know the space
-well enough to say "don't buy that one." `CLAUDE.md` rule 8 states this as a
+well enough to say "don't buy that one." `CLAUDE.md` section 20 states this as a
 standing rule for any future implementation of `RecommendationService`.
 
 ## What the current interface already protects

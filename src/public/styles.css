@@ -2549,3 +2549,9 @@ textarea {
   .product-card-ask { margin-left: 0; width: 100%; min-height: 44px; }
   .product-facts > div { grid-template-columns: 6.5rem 1fr; }
 }
+
+/* A form that has already been submitted (see initSubmitOnce in app.js). */
+.is-submitting {
+  opacity: 0.7;
+  cursor: progress;
+}
