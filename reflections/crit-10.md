@@ -60,7 +60,8 @@ cutoff. The factual account above is from 21 October 2026 (commits 719deed
 and 7a14d4d).*
 
 The Bug Relay idea was hard to turn into a website that was useful and easy
-to operate. The breakthrough was recognising that problem and moving to Buy
+to operate. The reproduction flow was awkward, and real bugs depend on each
+developer's environment, which one shared website can't really recreate. The breakthrough was recognising that problem and moving to Buy
 or Pass instead, where people take part through their own real purchasing
 experiences rather than a fixed debugging setup. I also built and checked
 the new product separately before moving it into this repository. That
